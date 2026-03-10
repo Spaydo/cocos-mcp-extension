@@ -340,6 +340,47 @@ export const methods: { [key: string]: (...args: any) => any } = {
         }
     },
 
+    instantiatePrefab(assetUuid: string, parentUuid?: string, name?: string) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+
+            return new Promise((resolve) => {
+                cc.assetManager.loadAny(assetUuid, (err: any, prefab: any) => {
+                    if (err) {
+                        resolve({ success: false, error: `Failed to load prefab: ${err.message || err}` });
+                        return;
+                    }
+                    if (!prefab || prefab.constructor?.name !== 'Prefab') {
+                        resolve({ success: false, error: 'Asset is not a Prefab' });
+                        return;
+                    }
+
+                    const node = cc.instantiate(prefab);
+                    if (name) {
+                        node.name = name;
+                    }
+
+                    // Find parent
+                    let parent = scene;
+                    if (parentUuid) {
+                        const found = findNodeByUuidDeep(scene, parentUuid);
+                        if (found) parent = found;
+                    }
+
+                    parent.addChild(node);
+                    resolve({
+                        success: true,
+                        data: { uuid: node.uuid, name: node.name },
+                        message: `Prefab instantiated: ${node.name}`,
+                    });
+                });
+            });
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
     createPrefabFromNode(nodeUuid: string, prefabPath: string) {
         try {
             const scene = requireScene();

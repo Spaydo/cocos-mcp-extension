@@ -9,10 +9,41 @@ import { ComponentTools } from './tools/component-tools';
 import { AssetTools } from './tools/asset-tools';
 import { PrefabTools } from './tools/prefab-tools';
 import { ProjectTools } from './tools/project-tools';
-import { DebugTools } from './tools/debug-tools';
+import { DebugTools, addLog } from './tools/debug-tools';
 
 let mcpServer: MCPServer | null = null;
 let editorVersion: string = '';
+
+// === Console capture ===
+const _origLog = console.log;
+const _origWarn = console.warn;
+const _origError = console.error;
+
+function hookConsole() {
+    console.log = (...args: any[]) => {
+        _origLog.apply(console, args);
+        addLog('log', args.map(String).join(' '));
+    };
+    console.warn = (...args: any[]) => {
+        _origWarn.apply(console, args);
+        addLog('warn', args.map(String).join(' '));
+    };
+    console.error = (...args: any[]) => {
+        _origError.apply(console, args);
+        addLog('error', args.map(String).join(' '));
+    };
+}
+
+function unhookConsole() {
+    console.log = _origLog;
+    console.warn = _origWarn;
+    console.error = _origError;
+}
+
+// === Editor message listener for capturing editor-level logs ===
+const editorLogHandler = (msg: any) => addLog('editor-log', String(msg));
+const editorWarnHandler = (msg: any) => addLog('editor-warn', String(msg));
+const editorErrorHandler = (msg: any) => addLog('editor-error', String(msg));
 
 /** Get the detected Cocos Creator editor version */
 export function getEditorVersion(): string {
@@ -67,13 +98,24 @@ export const methods: { [key: string]: (...any: any) => any } = {
  * Extension load - called when extension is enabled
  */
 export function load() {
-    // 1. Detect editor version
+    // 1. Hook console to capture logs
+    hookConsole();
+
+    // 2. Listen for editor-level broadcast messages
+    const msg = Editor.Message as any;
+    if (msg.addBroadcastListener) {
+        msg.addBroadcastListener('log:log', editorLogHandler);
+        msg.addBroadcastListener('log:warn', editorWarnHandler);
+        msg.addBroadcastListener('log:error', editorErrorHandler);
+    }
+
+    // 3. Detect editor version
     editorVersion = Editor.App.version || 'unknown';
 
-    // 2. Read settings
+    // 4. Read settings
     const settings = readSettings();
 
-    // 3. Create MCP server instance and register tools
+    // 5. Create MCP server instance and register tools
     mcpServer = new MCPServer(settings);
     mcpServer.registerToolCategory('scene', new SceneTools());
     mcpServer.registerToolCategory('node', new NodeTools());
@@ -83,7 +125,7 @@ export function load() {
     mcpServer.registerToolCategory('project', new ProjectTools());
     mcpServer.registerToolCategory('debug', new DebugTools());
 
-    // 4. Auto-start if configured
+    // 6. Auto-start if configured
     if (settings.autoStart) {
         mcpServer.start().catch((err: Error) => {
             console.warn(`[MCP] Auto-start failed: ${err.message}`);
@@ -97,9 +139,21 @@ export function load() {
  * Extension unload - called when extension is disabled
  */
 export function unload() {
+    // Remove editor broadcast listeners
+    const msg = Editor.Message as any;
+    if (msg.removeBroadcastListener) {
+        msg.removeBroadcastListener('log:log', editorLogHandler);
+        msg.removeBroadcastListener('log:warn', editorWarnHandler);
+        msg.removeBroadcastListener('log:error', editorErrorHandler);
+    }
+
     if (mcpServer) {
         mcpServer.stop();
         mcpServer = null;
     }
+
     console.log('[MCP] Cocos MCP Extension unloaded');
+
+    // Restore original console
+    unhookConsole();
 }
