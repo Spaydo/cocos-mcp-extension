@@ -1,3 +1,5 @@
+**[English](README.en.md)** | **中文**
+
 # Cocos MCP Extension
 
 Cocos Creator 編輯器擴展，提供 MCP (Model Context Protocol) HTTP Server，讓 AI 助手（Claude Code、Cursor 等）通過 JSON-RPC 2.0 協議遠程控制 Cocos Creator 編輯器。
@@ -12,115 +14,96 @@ npm install
 npm run build
 ```
 
+> **注意：** 已預編譯的擴展可直接使用，無需執行上述命令。僅在修改原始碼後才需要重新編譯。
+
 ## 使用方式
 
-1. 在 Cocos Creator 中，打開 **Extension → Cocos MCP → MCP Server Panel**
-2. 設定端口（默認 3000）
-3. 開啟 MCP Server 開關
-4. 狀態顯示 Running 後即可連接
+1. 在 Cocos Creator 中，打開 **Extension → Extension Manager → Installed**，啟用本擴展
+2. 打開 **Extension → Cocos MCP → MCP Server Panel**
+3. 設定端口（默認 3000）
+4. 開啟 MCP Server 開關
+5. 狀態顯示 Running 後即可連接
 
 ## AI 客戶端 MCP 配置
 
-MCP Server 啟動後，需要在你使用的 AI 工具中配置連接資訊。每個工具的配置方式不同，範例檔案統一放在 [`mcp-configs/`](mcp-configs/) 目錄下。
+MCP Server 啟動後，需要在你使用的 AI 工具中配置連接資訊。各工具的配置範例與說明請參考 [`mcp-configs/README.md`](mcp-configs/README.md)。
 
-> **端口提示：** 以下範例均使用默認端口 `3000`，如果你修改了端口，請自行替換 URL 中的端口號。
+支援的 AI 工具：VS Code + Claude Code、Claude Desktop / CLI、Cursor、Windsurf。
 
-### VS Code + Claude Code Extension
-
-將 `.mcp.json` 複製到你的**項目根目錄**（不是擴展目錄）：
-
-```json
-{
-  "mcpServers": {
-    "cocos-creator": {
-      "type": "http",
-      "url": "http://127.0.0.1:3000/mcp"
-    }
-  }
-}
-```
-
-**檔案位置：** `<your-project-root>/.mcp.json`
-
-配置後重啟 Claude Code 會話即可生效。
-
-### Claude Desktop / Claude Code CLI
-
-使用 CLI 命令快速新增：
-
-```bash
-claude mcp add --transport http cocos-creator http://127.0.0.1:3000/mcp
-```
-
-或手動編輯配置檔。Claude Desktop 配置位於：
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "cocos-creator": {
-      "type": "url",
-      "url": "http://127.0.0.1:3000/mcp"
-    }
-  }
-}
-```
-
-### Cursor
-
-在項目根目錄建立 `.cursor/mcp.json`：
-
-```json
-{
-  "mcpServers": {
-    "cocos-creator": {
-      "url": "http://127.0.0.1:3000/mcp"
-    }
-  }
-}
-```
-
-**檔案位置：** `<your-project-root>/.cursor/mcp.json`
-
-### Windsurf
-
-在項目根目錄建立 `.windsurf/mcp.json`：
-
-```json
-{
-  "mcpServers": {
-    "cocos-creator": {
-      "serverUrl": "http://127.0.0.1:3000/mcp"
-    }
-  }
-}
-```
-
-**檔案位置：** `<your-project-root>/.windsurf/mcp.json`
-
-### 驗證連接
-
-配置完成後，可通過 curl 確認 Server 是否正常運行：
+驗證連接：
 
 ```bash
 curl http://localhost:3000/health
-# 預期回應: {"status":"ok","tools":28,...}
+# 預期回應: {"status":"ok","tools":29,...}
 ```
 
 ## 支持的工具
 
-| 分類 | 工具數 | 功能 |
-|------|--------|------|
-| scene | 6 | 場景查詢、打開、保存、創建 |
-| node | 5 | 節點查詢、創建、刪除、屬性設定、移動 |
-| component | 4 | 組件添加、移除、查詢、屬性設定 |
-| asset | 5 | 資源查詢、創建、刪除、移動、UUID 轉換 |
-| prefab | 3 | 預製件列表、實例化、創建 |
-| project | 2 | 項目資訊、刷新資源 |
-| debug | 3 | 控制台日誌、執行腳本 |
+共 29 個工具，分為 7 個類別。MCP 工具名稱格式為 `類別_動作`。
 
-共 28 個工具。
+### Scene（場景）— 6 個
+
+| 工具名稱 | 說明 |
+|----------|------|
+| `scene_query` | 取得當前場景資訊與階層樹 |
+| `scene_list` | 列出項目中所有場景檔案 |
+| `scene_open` | 通過 `db://` 路徑打開場景 |
+| `scene_save` | 保存當前場景 |
+| `scene_create` | 創建新場景資源 |
+| `scene_snapshot` | 創建當前場景的 Undo 快照 |
+
+### Node（節點）— 5 個
+
+| 工具名稱 | 說明 |
+|----------|------|
+| `node_query` | 通過 UUID、名稱查詢節點，或列出所有節點 |
+| `node_create` | 在場景中創建新節點 |
+| `node_delete` | 刪除場景中的節點 |
+| `node_set_property` | 設定節點屬性（name、active、position、rotation、scale、layer） |
+| `node_move` | 移動節點到新的父節點 |
+
+### Component（組件）— 4 個
+
+| 工具名稱 | 說明 |
+|----------|------|
+| `component_add` | 為節點添加組件 |
+| `component_remove` | 移除節點上的組件 |
+| `component_query` | 查詢節點上的組件，可取得詳細屬性 |
+| `component_set_property` | 設定組件屬性值（支援 node、color、vec3 等類型） |
+
+### Asset（資源）— 5 個
+
+| 工具名稱 | 說明 |
+|----------|------|
+| `asset_query` | 通過 pattern、UUID 或 URL 查詢資源 |
+| `asset_create` | 創建新資源檔案 |
+| `asset_delete` | 刪除資源 |
+| `asset_move` | 移動或重命名資源 |
+| `asset_query_uuid` | 資源 URL 與 UUID 互相轉換 |
+
+### Prefab（預製件）— 4 個
+
+| 工具名稱 | 說明 |
+|----------|------|
+| `prefab_list` | 列出項目中所有預製件 |
+| `prefab_instantiate` | 將預製件實例化到場景中（正確建立 prefab 連結） |
+| `prefab_create` | 從場景節點創建預製件 |
+| `prefab_create_empty` | 直接創建空白預製件資源（無需場景節點） |
+
+### Project（項目）— 2 個
+
+| 工具名稱 | 說明 |
+|----------|------|
+| `project_info` | 取得項目路徑、引擎版本等資訊 |
+| `project_refresh` | 刷新資源資料庫 |
+
+### Debug（除錯）— 3 個
+
+| 工具名稱 | 說明 |
+|----------|------|
+| `debug_get_logs` | 取得擴展的最近日誌 |
+| `debug_clear_logs` | 清除日誌緩衝區 |
+| `debug_execute_script` | 在場景上下文中執行 JavaScript（可存取 cc.* API） |
 
 ## 版本兼容
 
