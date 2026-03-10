@@ -8,7 +8,22 @@ export interface MCPServerSettings {
     port: number;
     autoStart: boolean;
     enableDebugLog: boolean;
+    enabledCategories: Record<string, boolean>;
 }
+
+export const DEFAULT_ENABLED_CATEGORIES: Record<string, boolean> = {
+    scene: true,
+    node: true,
+    component: true,
+    asset: true,
+    prefab: true,
+    project: true,
+    debug: true,
+    scene_view: false,
+    editor: false,
+    reference_image: false,
+    animation: false,
+};
 
 export interface ServerStatus {
     running: boolean;

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { MCPServerSettings } from './types';
+import { MCPServerSettings, DEFAULT_ENABLED_CATEGORIES } from './types';
 
 const SETTINGS_FILE = 'mcp-extension.json';
 
@@ -8,6 +8,7 @@ const DEFAULT_SETTINGS: MCPServerSettings = {
     port: 3000,
     autoStart: false,
     enableDebugLog: false,
+    enabledCategories: { ...DEFAULT_ENABLED_CATEGORIES },
 };
 
 function getSettingsDir(): string {
@@ -28,7 +29,11 @@ export function readSettings(): MCPServerSettings {
         if (existsSync(filePath)) {
             const content = readFileSync(filePath, 'utf-8');
             const saved = JSON.parse(content);
-            return { ...DEFAULT_SETTINGS, ...saved };
+            return {
+                ...DEFAULT_SETTINGS,
+                ...saved,
+                enabledCategories: { ...DEFAULT_ENABLED_CATEGORIES, ...saved.enabledCategories },
+            };
         }
     } catch (err) {
         console.warn('[MCP] Failed to read settings, using defaults:', err);

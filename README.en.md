@@ -21,8 +21,9 @@ npm run build
 1. In Cocos Creator, open **Extension → Extension Manager → Installed** and enable the extension
 2. Open **Extension → Cocos MCP → MCP Server Panel**
 3. Set the port (default: 3000)
-4. Enable the MCP Server toggle
-5. Once the status shows "Running", you're ready to connect
+4. In the **Tool Categories** section, check the tool categories you want to enable
+5. Enable the MCP Server toggle
+6. Once the status shows "Running", you're ready to connect
 
 ## AI Client MCP Configuration
 
@@ -34,14 +35,16 @@ Verify connection:
 
 ```bash
 curl http://localhost:3000/health
-# Expected response: {"status":"ok","tools":29,...}
+# Expected response: {"status":"ok","tools":68,...}
 ```
 
 ## Supported Tools
 
-29 tools across 7 categories. MCP tool names follow the `category_action` format.
+68 tools across 11 categories (7 core + 4 advanced). MCP tool names follow the `category_action` format.
 
-### Scene — 6 tools
+You can enable/disable tool categories in the panel's **Tool Categories** section to reduce AI token usage.
+
+### Scene — 9 tools
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -51,27 +54,35 @@ curl http://localhost:3000/health
 | `scene_save` | Save the current scene |
 | `scene_create` | Create a new scene asset |
 | `scene_snapshot` | Create an undo snapshot of the current scene |
+| `scene_dirty` | Check if scene has unsaved changes |
+| `scene_reload` | Soft reload the current scene |
+| `scene_classes` | List all registered component classes |
 
-### Node — 5 tools
+### Node — 8 tools
 
 | Tool Name | Description |
 |-----------|-------------|
-| `node_query` | Query node by UUID, name, or list all nodes |
-| `node_create` | Create a new node in the scene |
+| `node_query` | Query node by UUID, name, or list all nodes (supports includeComponents) |
+| `node_create` | Create a new node (supports setting position, rotation, scale, components in one call) |
 | `node_delete` | Delete a node from the scene |
-| `node_set_property` | Set node property (name, active, position, rotation, scale, layer) |
+| `node_set_property` | Set node property (supports batch mode) |
 | `node_move` | Move node to a new parent |
+| `node_duplicate` | Duplicate a node |
+| `node_reset_transform` | Reset node position/rotation/scale to defaults |
+| `node_find_by_asset` | Find all nodes using a specific asset |
 
-### Component — 4 tools
+### Component — 6 tools
 
 | Tool Name | Description |
 |-----------|-------------|
 | `component_add` | Add a component to a node |
 | `component_remove` | Remove a component from a node |
 | `component_query` | Query components on a node with optional detailed properties |
-| `component_set_property` | Set a component property value (supports node, color, vec3, etc.) |
+| `component_set_property` | Set component property (supports batch mode, node, color, vec3, etc.) |
+| `component_reset` | Reset a component to default values |
+| `component_list_types` | List all available component types |
 
-### Asset — 5 tools
+### Asset — 7 tools
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -79,23 +90,28 @@ curl http://localhost:3000/health
 | `asset_create` | Create a new asset file |
 | `asset_delete` | Delete an asset |
 | `asset_move` | Move or rename an asset |
+| `asset_import` | Import an external file as an asset |
+| `asset_info` | Get detailed asset metadata and dependencies |
 | `asset_query_uuid` | Convert between asset URL and UUID |
 
-### Prefab — 4 tools
+### Prefab — 5 tools
 
 | Tool Name | Description |
 |-----------|-------------|
 | `prefab_list` | List all prefab assets in the project |
 | `prefab_instantiate` | Instantiate a prefab into the scene (with proper prefab linking) |
 | `prefab_create` | Create a prefab from an existing scene node |
+| `prefab_restore` | Restore a prefab instance to its original state |
 | `prefab_create_empty` | Create a new empty prefab asset directly (no scene node needed) |
 
-### Project — 2 tools
+### Project — 4 tools
 
 | Tool Name | Description |
 |-----------|-------------|
 | `project_info` | Get project path, engine version, and settings |
 | `project_refresh` | Refresh the asset database |
+| `project_build` | Build project for a target platform |
+| `project_preview` | Start or stop game preview |
 
 ### Debug — 3 tools
 
@@ -104,6 +120,52 @@ curl http://localhost:3000/health
 | `debug_get_logs` | Get recent console logs from the extension |
 | `debug_clear_logs` | Clear the log buffer |
 | `debug_execute_script` | Execute JavaScript in scene context (has access to cc.* APIs) |
+
+### Scene View — 10 tools *(advanced)*
+
+| Tool Name | Description |
+|-----------|-------------|
+| `scene_view_gizmo_tool` | Get or set gizmo tool (position/rotation/scale/rect) |
+| `scene_view_gizmo_pivot` | Get or set gizmo pivot (pivot/center) |
+| `scene_view_gizmo_coordinate` | Get or set coordinate system (local/global) |
+| `scene_view_view_mode` | Get or set 2D/3D view mode |
+| `scene_view_grid` | Show or hide the scene grid |
+| `scene_view_focus` | Focus scene camera on specific node(s) |
+| `scene_view_align_camera` | Align scene camera with current view |
+| `scene_view_align_view` | Align view with a specific node |
+| `scene_view_icon_gizmo` | Get or set icon gizmo 3D mode and size |
+| `scene_view_status` | Get all scene view settings at once |
+
+### Editor — 5 tools *(advanced)*
+
+| Tool Name | Description |
+|-----------|-------------|
+| `editor_preferences_query` | Read editor or project preferences |
+| `editor_preferences_set` | Write editor or project preferences |
+| `editor_open_settings` | Open the preferences panel |
+| `editor_network_info` | Get server IPs and port info |
+| `editor_editor_info` | Get editor version, platform, Node.js version |
+
+### Reference Image — 7 tools *(advanced)*
+
+| Tool Name | Description |
+|-----------|-------------|
+| `reference_image_add` | Add a reference image to the scene view |
+| `reference_image_remove` | Remove a reference image |
+| `reference_image_switch` | Switch active reference image |
+| `reference_image_set_property` | Set reference image position, scale, opacity |
+| `reference_image_query` | Get all reference image configurations |
+| `reference_image_query_current` | Get current active reference image info |
+| `reference_image_clear` | Remove all reference images |
+
+### Animation — 4 tools *(advanced)*
+
+| Tool Name | Description |
+|-----------|-------------|
+| `animation_list_clips` | List animation clips on a node |
+| `animation_play` | Play an animation clip |
+| `animation_stop` | Stop animation playback |
+| `animation_set_clip` | Set default animation clip or animation properties |
 
 ## Compatibility
 

@@ -28,7 +28,10 @@ export class MCPServer {
 
     setupTools(): void {
         this.toolsList = [];
+        const enabled = this.settings.enabledCategories || {};
         for (const [category, executor] of Object.entries(this.tools)) {
+            // Skip disabled categories (default to enabled if not in settings)
+            if (enabled[category] === false) continue;
             const tools = executor.getTools();
             for (const tool of tools) {
                 this.toolsList.push({
@@ -38,6 +41,15 @@ export class MCPServer {
             }
         }
         this.log(`Tools registered: ${this.toolsList.length}`);
+    }
+
+    getRegisteredCategories(): { category: string; toolCount: number; enabled: boolean }[] {
+        const enabled = this.settings.enabledCategories || {};
+        return Object.entries(this.tools).map(([category, executor]) => ({
+            category,
+            toolCount: executor.getTools().length,
+            enabled: enabled[category] !== false,
+        }));
     }
 
     // === Server Lifecycle ===
@@ -90,6 +102,8 @@ export class MCPServer {
     updateSettings(settings: MCPServerSettings): void {
         this.settings = settings;
         this.enableDebugLog = settings.enableDebugLog;
+        // Rebuild tool list when categories change
+        this.setupTools();
     }
 
     // === HTTP Request Handling ===
@@ -246,18 +260,24 @@ export class MCPServer {
     // === Tool Execution ===
 
     private async executeToolCall(toolName: string, args: any): Promise<ToolResponse> {
-        const idx = toolName.indexOf('_');
-        if (idx === -1) {
+        // Match longest registered category name first (handles scene_view, reference_image, etc.)
+        let category = '';
+        let method = '';
+        const sortedCategories = Object.keys(this.tools).sort((a, b) => b.length - a.length);
+        for (const cat of sortedCategories) {
+            const prefix = cat + '_';
+            if (toolName.startsWith(prefix)) {
+                category = cat;
+                method = toolName.substring(prefix.length);
+                break;
+            }
+        }
+
+        if (!category) {
             throw new Error(`Invalid tool name format: ${toolName}`);
         }
 
-        const category = toolName.substring(0, idx);
-        const method = toolName.substring(idx + 1);
-
         const executor = this.tools[category];
-        if (!executor) {
-            throw new Error(`Unknown tool category: ${category}`);
-        }
 
         this.log(`[MCP] Executing: ${category}.${method}`);
         const result = await executor.execute(method, args);

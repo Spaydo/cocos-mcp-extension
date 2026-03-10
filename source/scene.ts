@@ -399,6 +399,115 @@ export const methods: { [key: string]: (...args: any) => any } = {
         }
     },
 
+    // === Animation Methods ===
+
+    getAnimationClips(nodeUuid: string) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+            const node = requireNode(scene, nodeUuid);
+
+            const animComp = node.getComponent(cc.Animation);
+            if (!animComp) {
+                return { success: false, error: 'No Animation component found on node' };
+            }
+
+            const clips = (animComp.clips || []).map((clip: any) => ({
+                name: clip?.name || 'unknown',
+                duration: clip?.duration || 0,
+                speed: clip?.speed || 1,
+                wrapMode: clip?.wrapMode,
+            }));
+
+            return {
+                success: true,
+                data: {
+                    nodeUuid,
+                    defaultClip: animComp.defaultClip?.name || null,
+                    playOnLoad: animComp.playOnLoad || false,
+                    clips,
+                },
+            };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    playAnimation(nodeUuid: string, clipName?: string) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+            const node = requireNode(scene, nodeUuid);
+
+            const animComp = node.getComponent(cc.Animation);
+            if (!animComp) {
+                return { success: false, error: 'No Animation component found on node' };
+            }
+
+            if (clipName) {
+                animComp.play(clipName);
+            } else {
+                animComp.play();
+            }
+
+            return { success: true, message: `Animation playing${clipName ? `: ${clipName}` : ''}` };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    stopAnimation(nodeUuid: string) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+            const node = requireNode(scene, nodeUuid);
+
+            const animComp = node.getComponent(cc.Animation);
+            if (!animComp) {
+                return { success: false, error: 'No Animation component found on node' };
+            }
+
+            animComp.stop();
+            return { success: true, message: 'Animation stopped' };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    setAnimationProperty(nodeUuid: string, defaultClip?: string, playOnLoad?: boolean) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+            const node = requireNode(scene, nodeUuid);
+
+            const animComp = node.getComponent(cc.Animation);
+            if (!animComp) {
+                return { success: false, error: 'No Animation component found on node' };
+            }
+
+            const changed: string[] = [];
+
+            if (defaultClip !== undefined) {
+                const clip = animComp.clips.find((c: any) => c?.name === defaultClip);
+                if (clip) {
+                    animComp.defaultClip = clip;
+                    changed.push(`defaultClip=${defaultClip}`);
+                } else {
+                    return { success: false, error: `Clip not found: ${defaultClip}` };
+                }
+            }
+
+            if (playOnLoad !== undefined) {
+                animComp.playOnLoad = playOnLoad;
+                changed.push(`playOnLoad=${playOnLoad}`);
+            }
+
+            return { success: true, message: `Animation properties set: ${changed.join(', ')}` };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
     executeScript(code: string) {
         try {
             const cc = require('cc');

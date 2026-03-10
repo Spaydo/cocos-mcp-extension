@@ -70,6 +70,23 @@ export class ComponentTools implements ToolExecutor {
                     required: ['nodeUuid', 'componentType'],
                 },
             },
+            {
+                name: 'reset',
+                description: 'Reset a component to its default values',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeUuid: { type: 'string' },
+                        componentType: { type: 'string', description: 'Component type to reset' },
+                    },
+                    required: ['nodeUuid', 'componentType'],
+                },
+            },
+            {
+                name: 'list_types',
+                description: 'List all available component types that can be added to nodes',
+                inputSchema: { type: 'object', properties: {} },
+            },
         ];
     }
 
@@ -79,6 +96,8 @@ export class ComponentTools implements ToolExecutor {
             case 'remove': return this.removeComponent(args.nodeUuid, args.componentType);
             case 'query': return this.queryComponents(args.nodeUuid, args.componentType);
             case 'set_property': return this.setProperty(args);
+            case 'reset': return this.resetComponent(args.nodeUuid, args.componentType);
+            case 'list_types': return this.listTypes();
             default: return { success: false, error: `Unknown component tool: ${toolName}` };
         }
     }
@@ -293,6 +312,30 @@ export class ComponentTools implements ToolExecutor {
         }
 
         return compIndex;
+    }
+
+    private async resetComponent(nodeUuid: string, componentType: string): Promise<ToolResponse> {
+        try {
+            const compIndex = await this.findComponentIndex(nodeUuid, componentType);
+            if (typeof compIndex === 'object') return compIndex;
+
+            await (Editor.Message.request as any)('scene', 'reset-component', {
+                uuid: nodeUuid,
+                index: compIndex,
+            });
+            return { success: true, message: `Reset ${componentType} on node ${nodeUuid}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async listTypes(): Promise<ToolResponse> {
+        try {
+            const classes: any = await (Editor.Message.request as any)('scene', 'query-classes');
+            return { success: true, data: classes };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
     }
 
     // === Helpers ===

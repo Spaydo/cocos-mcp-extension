@@ -55,6 +55,21 @@ export class SceneTools implements ToolExecutor {
                 description: 'Create an undo snapshot of current scene',
                 inputSchema: { type: 'object', properties: {} },
             },
+            {
+                name: 'dirty',
+                description: 'Check if the current scene has unsaved changes',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'reload',
+                description: 'Soft reload the current scene',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'classes',
+                description: 'List all registered component classes',
+                inputSchema: { type: 'object', properties: {} },
+            },
         ];
     }
 
@@ -66,6 +81,9 @@ export class SceneTools implements ToolExecutor {
             case 'save': return this.save();
             case 'create': return this.create(args.name, args.path);
             case 'snapshot': return this.snapshot();
+            case 'dirty': return this.dirty();
+            case 'reload': return this.reload();
+            case 'classes': return this.classes();
             default: return { success: false, error: `Unknown scene tool: ${toolName}` };
         }
     }
@@ -158,6 +176,33 @@ export class SceneTools implements ToolExecutor {
         try {
             await Editor.Message.request('scene', 'snapshot');
             return { success: true, message: 'Undo snapshot created' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async dirty(): Promise<ToolResponse> {
+        try {
+            const isDirty: any = await Editor.Message.request('scene', 'query-dirty');
+            return { success: true, data: { dirty: !!isDirty } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async reload(): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('scene', 'soft-reload');
+            return { success: true, message: 'Scene reloaded' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async classes(): Promise<ToolResponse> {
+        try {
+            const classes: any = await (Editor.Message.request as any)('scene', 'query-classes');
+            return { success: true, data: classes };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

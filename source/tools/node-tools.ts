@@ -70,6 +70,39 @@ export class NodeTools implements ToolExecutor {
                 },
             },
             {
+                name: 'duplicate',
+                description: 'Duplicate a node (copy + paste)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Node UUID to duplicate' },
+                    },
+                    required: ['uuid'],
+                },
+            },
+            {
+                name: 'reset_transform',
+                description: 'Reset node position/rotation/scale to defaults',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string' },
+                    },
+                    required: ['uuid'],
+                },
+            },
+            {
+                name: 'find_by_asset',
+                description: 'Find all nodes using a specific asset UUID',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        assetUuid: { type: 'string', description: 'Asset UUID to search for' },
+                    },
+                    required: ['assetUuid'],
+                },
+            },
+            {
                 name: 'move',
                 description: 'Move node to a new parent',
                 inputSchema: {
@@ -91,6 +124,9 @@ export class NodeTools implements ToolExecutor {
             case 'create': return this.createNode(args);
             case 'delete': return this.deleteNode(args.uuid);
             case 'set_property': return this.setPropertyDispatch(args);
+            case 'duplicate': return this.duplicateNode(args.uuid);
+            case 'reset_transform': return this.resetTransform(args.uuid);
+            case 'find_by_asset': return this.findByAsset(args.assetUuid);
             case 'move': return this.moveNode(args.uuid, args.parentUuid, args.siblingIndex);
             default: return { success: false, error: `Unknown node tool: ${toolName}` };
         }
@@ -409,6 +445,52 @@ export class NodeTools implements ToolExecutor {
             }
 
             return { success: true, message: `Moved node ${uuid} to parent ${parentUuid}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async duplicateNode(uuid: string): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('scene', 'copy-node', [uuid]);
+            const result: any = await (Editor.Message.request as any)('scene', 'paste-node');
+            return {
+                success: true,
+                data: result,
+                message: `Node duplicated: ${uuid}`,
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async resetTransform(uuid: string): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('scene', 'set-property', {
+                uuid,
+                path: 'position',
+                dump: { value: { x: 0, y: 0, z: 0 } },
+            });
+            await Editor.Message.request('scene', 'set-property', {
+                uuid,
+                path: 'euler',
+                dump: { value: { x: 0, y: 0, z: 0 } },
+            });
+            await Editor.Message.request('scene', 'set-property', {
+                uuid,
+                path: 'scale',
+                dump: { value: { x: 1, y: 1, z: 1 } },
+            });
+            return { success: true, message: `Transform reset on node ${uuid}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async findByAsset(assetUuid: string): Promise<ToolResponse> {
+        try {
+            const result: any = await Editor.Message.request('scene', 'query-nodes-by-asset-uuid', assetUuid);
+            return { success: true, data: result || [] };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

@@ -43,6 +43,17 @@ export class PrefabTools implements ToolExecutor {
                 },
             },
             {
+                name: 'restore',
+                description: 'Restore a prefab instance node to its original prefab state',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeUuid: { type: 'string', description: 'Prefab instance node UUID to restore' },
+                    },
+                    required: ['nodeUuid'],
+                },
+            },
+            {
                 name: 'create_empty',
                 description: 'Create a new empty prefab asset directly (no scene node needed)',
                 inputSchema: {
@@ -63,6 +74,7 @@ export class PrefabTools implements ToolExecutor {
             case 'instantiate': return this.instantiate(args);
             case 'create': return this.create(args.nodeUuid, args.path);
             case 'create_empty': return this.createEmpty(args.name, args.path);
+            case 'restore': return this.restore(args.nodeUuid);
             default: return { success: false, error: `Unknown prefab tool: ${toolName}` };
         }
     }
@@ -142,6 +154,15 @@ export class PrefabTools implements ToolExecutor {
                 data: { uuid: result?.uuid, path: prefabPath },
                 message: `Empty prefab created: ${prefabPath}`,
             };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async restore(nodeUuid: string): Promise<ToolResponse> {
+        try {
+            await (Editor.Message.request as any)('scene', 'restore-prefab', nodeUuid);
+            return { success: true, message: `Prefab instance restored: ${nodeUuid}` };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

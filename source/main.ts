@@ -10,6 +10,10 @@ import { AssetTools } from './tools/asset-tools';
 import { PrefabTools } from './tools/prefab-tools';
 import { ProjectTools } from './tools/project-tools';
 import { DebugTools, addLog } from './tools/debug-tools';
+import { SceneViewTools } from './tools/scene-view-tools';
+import { EditorTools } from './tools/editor-tools';
+import { ReferenceImageTools } from './tools/reference-image-tools';
+import { AnimationTools } from './tools/animation-tools';
 
 let mcpServer: MCPServer | null = null;
 let editorVersion: string = '';
@@ -75,14 +79,19 @@ export const methods: { [key: string]: (...any: any) => any } = {
         return { success: true };
     },
 
-    getServerStatus(): { running: boolean; port: number; tools: number; autoStart: boolean } {
+    getServerStatus() {
         const settings = readSettings();
         return {
             running: mcpServer?.isRunning() ?? false,
             port: settings.port,
             tools: mcpServer?.getToolCount() ?? 0,
             autoStart: settings.autoStart,
+            enabledCategories: settings.enabledCategories,
         };
+    },
+
+    getCategories() {
+        return mcpServer?.getRegisteredCategories() ?? [];
     },
 
     updateSettings(settings: MCPServerSettings): { success: boolean } {
@@ -124,6 +133,10 @@ export function load() {
     mcpServer.registerToolCategory('prefab', new PrefabTools());
     mcpServer.registerToolCategory('project', new ProjectTools());
     mcpServer.registerToolCategory('debug', new DebugTools());
+    mcpServer.registerToolCategory('scene_view', new SceneViewTools());
+    mcpServer.registerToolCategory('editor', new EditorTools());
+    mcpServer.registerToolCategory('reference_image', new ReferenceImageTools());
+    mcpServer.registerToolCategory('animation', new AnimationTools());
 
     // 6. Auto-start if configured
     if (settings.autoStart) {

@@ -52,6 +52,29 @@ export class AssetTools implements ToolExecutor {
                 },
             },
             {
+                name: 'import',
+                description: 'Import an external file as an asset into the project',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        source: { type: 'string', description: 'Absolute file system path of the source file' },
+                        target: { type: 'string', description: 'Target db:// path, e.g. db://assets/textures/my-image.png' },
+                    },
+                    required: ['source', 'target'],
+                },
+            },
+            {
+                name: 'info',
+                description: 'Get detailed asset metadata including dependencies and library info',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Asset UUID' },
+                        url: { type: 'string', description: 'Asset db:// URL' },
+                    },
+                },
+            },
+            {
                 name: 'query_uuid',
                 description: 'Convert between asset URL and UUID',
                 inputSchema: {
@@ -71,6 +94,8 @@ export class AssetTools implements ToolExecutor {
             case 'create': return this.create(args.url, args.content);
             case 'delete': return this.deleteAsset(args.url);
             case 'move': return this.move(args.source, args.target);
+            case 'import': return this.importAsset(args.source, args.target);
+            case 'info': return this.assetInfo(args);
             case 'query_uuid': return this.queryUuid(args);
             default: return { success: false, error: `Unknown asset tool: ${toolName}` };
         }
@@ -160,6 +185,50 @@ export class AssetTools implements ToolExecutor {
         try {
             await Editor.Message.request('asset-db', 'move-asset', source, target);
             return { success: true, message: `Moved ${source} → ${target}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async importAsset(source: string, target: string): Promise<ToolResponse> {
+        try {
+            const { readFileSync } = require('fs');
+            const content = readFileSync(source);
+            const base64 = content.toString('base64');
+            const result: any = await (Editor.Message.request as any)('asset-db', 'import-asset', source, target);
+            return {
+                success: true,
+                data: { uuid: result?.uuid, url: target },
+                message: `Asset imported: ${source} → ${target}`,
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async assetInfo(args: any): Promise<ToolResponse> {
+        try {
+            const identifier = args.uuid || args.url;
+            if (!identifier) {
+                return { success: false, error: 'Provide uuid or url' };
+            }
+            const info: any = await Editor.Message.request('asset-db', 'query-asset-info', identifier);
+            if (!info) {
+                return { success: false, error: `Asset not found: ${identifier}` };
+            }
+            const data: any = {
+                name: info.name,
+                uuid: info.uuid,
+                url: info.url || info.path,
+                type: info.type,
+                isDirectory: info.isDirectory || false,
+            };
+            // Include additional metadata if available
+            if (info.file) data.file = info.file;
+            if (info.library) data.library = info.library;
+            if (info.subAssets) data.subAssets = info.subAssets;
+            if (info.depends) data.depends = info.depends;
+            return { success: true, data };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
