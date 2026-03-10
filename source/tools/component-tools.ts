@@ -265,7 +265,7 @@ export class ComponentTools implements ToolExecutor {
                 };
 
             case 'node':
-                return { value: { uuid: value } };
+                return { value: { uuid: value }, type: 'cc.Node' };
 
             case 'spriteFrame':
             case 'asset':
