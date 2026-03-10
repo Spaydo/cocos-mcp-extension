@@ -11,38 +11,30 @@
     },
     "description": "i18n:cocos-mcp-extension.description",
     "main": "./dist/main.js",
-    "dependencies": {
-        "fs-extra": "^10.0.0"
-    },
     "devDependencies": {
         "@cocos/creator-types": "^3.8.4",
-        "@types/fs-extra": "^9.0.5",
-        "@types/node": "^18.17.1"
+        "@types/node": "^18.17.1",
+        "typescript": "^5.9.3"
     },
     "panels": {
         "default": {
-            "title": "cocos-mcp-extension Default Panel",
+            "title": "i18n:cocos-mcp-extension.panel_title",
             "type": "dockable",
             "main": "dist/panels/default",
             "size": {
                 "min-width": 400,
                 "min-height": 300,
-                "width": 1024,
-                "height": 600
+                "width": 600,
+                "height": 500
             }
         }
     },
     "contributions": {
         "menu": [
             {
-                "path": "i18n:menu.panel/cocos-mcp-extension",
+                "path": "i18n:menu.extension/Cocos MCP",
                 "label": "i18n:cocos-mcp-extension.open_panel",
                 "message": "open-panel"
-            },
-            {
-                "path": "i18n:menu.develop/cocos-mcp-extension",
-                "label": "i18n:cocos-mcp-extension.send_to_panel",
-                "message": "send-to-panel"
             }
         ],
         "messages": {
@@ -51,11 +43,29 @@
                     "openPanel"
                 ]
             },
-            "send-to-panel": {
+            "start-server": {
                 "methods": [
-                    "default.hello"
+                    "startServer"
+                ]
+            },
+            "stop-server": {
+                "methods": [
+                    "stopServer"
+                ]
+            },
+            "get-server-status": {
+                "methods": [
+                    "getServerStatus"
+                ]
+            },
+            "update-settings": {
+                "methods": [
+                    "updateSettings"
                 ]
             }
+        },
+        "scene": {
+            "script": "./dist/scene.js"
         }
     }
 }

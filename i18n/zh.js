@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = {
-    'open_panel': '默认面板',
-    'send_to_panel': '发送消息给面板',
-    'description': '含有一个面板的扩展',
+    'open_panel': 'MCP 服務器面板',
+    'description': 'MCP 服務器擴展，用於 AI 控制 Cocos Creator 編輯器',
+    'panel_title': 'Cocos MCP 服務器',
 };
