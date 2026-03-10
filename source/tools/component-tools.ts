@@ -44,17 +44,30 @@ export class ComponentTools implements ToolExecutor {
             },
             {
                 name: 'set_property',
-                description: 'Set a component property value',
+                description: 'Set one or multiple component properties at once. Use "properties" array for batch, or single "property"+"propertyType"+"value"',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         nodeUuid: { type: 'string' },
                         componentType: { type: 'string', description: 'Target component type' },
-                        property: { type: 'string' },
-                        propertyType: { type: 'string', description: 'Type hint: string, number, boolean, color, vec2, vec3, size, node, spriteFrame, asset' },
-                        value: { description: 'Property value' },
+                        property: { type: 'string', description: 'Single mode: property name' },
+                        propertyType: { type: 'string', description: 'Single mode type hint: string, number, boolean, color, vec2, vec3, size, node, spriteFrame, asset' },
+                        value: { description: 'Single mode: property value' },
+                        properties: {
+                            type: 'array',
+                            description: 'Batch mode: [{property, propertyType, value}, ...]',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    property: { type: 'string' },
+                                    propertyType: { type: 'string' },
+                                    value: {},
+                                },
+                                required: ['property', 'propertyType', 'value'],
+                            },
+                        },
                     },
-                    required: ['nodeUuid', 'componentType', 'property', 'propertyType', 'value'],
+                    required: ['nodeUuid', 'componentType'],
                 },
             },
         ];
@@ -180,33 +193,64 @@ export class ComponentTools implements ToolExecutor {
     }
 
     private async setProperty(args: any): Promise<ToolResponse> {
-        const { nodeUuid, componentType, property, propertyType, value } = args;
+        const { nodeUuid, componentType } = args;
 
+        // Batch mode: properties array
+        if (args.properties && Array.isArray(args.properties)) {
+            return this.setPropertyBatch(nodeUuid, componentType, args.properties);
+        }
+
+        // Single mode (backward compatible)
+        const { property, propertyType, value } = args;
+        if (!property || !propertyType || value === undefined) {
+            return { success: false, error: 'Provide "property"+"propertyType"+"value" or "properties" array' };
+        }
+
+        return this.setOneProperty(nodeUuid, componentType, property, propertyType, value);
+    }
+
+    private async setPropertyBatch(nodeUuid: string, componentType: string, properties: any[]): Promise<ToolResponse> {
+        // Query node once for all properties
+        const compIndex = await this.findComponentIndex(nodeUuid, componentType);
+        if (typeof compIndex === 'object') return compIndex; // error response
+
+        const results: string[] = [];
+        const errors: string[] = [];
+
+        for (const item of properties) {
+            try {
+                const path = `__comps__.${compIndex}.${item.property}`;
+                const dump = this.buildDump(item.propertyType, item.value);
+                await Editor.Message.request('scene', 'set-property', {
+                    uuid: nodeUuid,
+                    path,
+                    dump,
+                });
+                results.push(item.property);
+            } catch (err: any) {
+                errors.push(`${item.property}: ${err.message}`);
+            }
+        }
+
+        await this.delay(200);
+
+        if (errors.length > 0) {
+            return {
+                success: results.length > 0,
+                message: `Set: [${results.join(', ')}]` + ` Errors: [${errors.join('; ')}]`,
+            };
+        }
+        return { success: true, message: `Set ${componentType}: [${results.join(', ')}]` };
+    }
+
+    private async setOneProperty(nodeUuid: string, componentType: string, property: string, propertyType: string, value: any): Promise<ToolResponse> {
         try {
-            // Step 1: Query node to find component index
-            const nodeData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
-            if (!nodeData) {
-                return { success: false, error: `Node not found: ${nodeUuid}` };
-            }
+            const compIndex = await this.findComponentIndex(nodeUuid, componentType);
+            if (typeof compIndex === 'object') return compIndex; // error response
 
-            const comps = nodeData.__comps__ || [];
-            const compIndex = comps.findIndex((c: any) => {
-                const t = c.type || c.__type__ || c.cid || '';
-                return t === componentType || t.includes(componentType);
-            });
-
-            if (compIndex === -1) {
-                const available = comps.map((c: any) => c.type || c.__type__ || c.cid).join(', ');
-                return { success: false, error: `Component ${componentType} not found. Available: ${available}` };
-            }
-
-            // Step 2: Build property path
             const path = `__comps__.${compIndex}.${property}`;
-
-            // Step 3: Process value based on propertyType
             const dump = this.buildDump(propertyType, value);
 
-            // Step 4: Set property
             await Editor.Message.request('scene', 'set-property', {
                 uuid: nodeUuid,
                 path,
@@ -229,6 +273,26 @@ export class ComponentTools implements ToolExecutor {
                 return { success: false, error: err.message };
             }
         }
+    }
+
+    private async findComponentIndex(nodeUuid: string, componentType: string): Promise<number | ToolResponse> {
+        const nodeData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
+        if (!nodeData) {
+            return { success: false, error: `Node not found: ${nodeUuid}` };
+        }
+
+        const comps = nodeData.__comps__ || [];
+        const compIndex = comps.findIndex((c: any) => {
+            const t = c.type || c.__type__ || c.cid || '';
+            return t === componentType || t.includes(componentType);
+        });
+
+        if (compIndex === -1) {
+            const available = comps.map((c: any) => c.type || c.__type__ || c.cid).join(', ');
+            return { success: false, error: `Component ${componentType} not found. Available: ${available}` };
+        }
+
+        return compIndex;
     }
 
     // === Helpers ===
