@@ -74,7 +74,7 @@ export class MCPServer {
         node: 'Node/GameObject operations (create, delete, transform, etc.)',
         component: 'Component management (add, remove, query, set properties, etc.)',
         asset: 'Asset database operations (query, create, import, dependencies, etc.)',
-        prefab: 'Prefab operations (list, instantiate, create, restore)',
+        prefab: 'Prefab operations (query, list, instantiate, create, restore)',
         project: 'Project-level operations (info, build, preview, config)',
         debug: 'Debugging utilities (logs, script execution)',
         scene_view: 'Scene view controls (gizmo, camera, grid, view mode)',

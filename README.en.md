@@ -35,12 +35,12 @@ Verify connection:
 
 ```bash
 curl http://localhost:3000/health
-# Expected response: {"status":"ok","tools":87,...}
+# Expected response: {"status":"ok","tools":88,...}
 ```
 
 ## Supported Tools
 
-87 tools across 11 categories (7 core + 4 advanced). MCP tool names follow the `category_action` format.
+88 tools across 11 categories (7 core + 4 advanced). MCP tool names follow the `category_action` format.
 
 You can enable/disable tool categories in the panel's **Tool Categories** section to reduce AI token usage.
 
@@ -108,10 +108,11 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `asset_open` | Open an asset in the editor |
 | `asset_reimport` | Re-import an asset (regenerate compiled/library files) |
 
-### Prefab — 5 tools
+### Prefab — 6 tools
 
 | Tool Name | Description |
 |-----------|-------------|
+| `prefab_query` | Query prefab internal node/component hierarchy (reads .prefab file, does not modify scene) |
 | `prefab_list` | List all prefab assets in the project |
 | `prefab_instantiate` | Instantiate a prefab into the scene (with proper prefab linking) |
 | `prefab_create` | Create a prefab from an existing scene node |
@@ -133,7 +134,7 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 
 | Tool Name | Description |
 |-----------|-------------|
-| `debug_get_logs` | Get recent console logs from the extension |
+| `debug_get_logs` | Get recent console/editor logs (supports errors_only, since timestamp filtering) |
 | `debug_clear_logs` | Clear the log buffer |
 | `debug_execute_script` | Execute JavaScript in scene context (has access to cc.* APIs) |
 

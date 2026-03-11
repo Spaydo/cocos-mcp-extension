@@ -1,4 +1,6 @@
 import { randomBytes } from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ToolDefinition, ToolResponse, ToolExecutor } from '../types';
 
 const EXTENSION_NAME = 'cocos-mcp-extension';
@@ -12,6 +14,18 @@ export class PrefabTools implements ToolExecutor {
 
     getTools(): ToolDefinition[] {
         return [
+            {
+                name: 'query',
+                description: 'Query prefab internal node/component hierarchy (reads .prefab file, does not modify scene)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        path: { type: 'string', description: 'db:// path to the prefab, e.g. db://assets/prefabs/my.prefab' },
+                        uuid: { type: 'string', description: 'Prefab asset UUID (alternative to path)' },
+                        maxDepth: { type: 'number', description: 'Max tree depth (default 10)' },
+                    },
+                },
+            },
             {
                 name: 'list',
                 description: 'List all prefab assets in the project. Use filter to narrow results',
@@ -75,6 +89,7 @@ export class PrefabTools implements ToolExecutor {
 
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
+            case 'query': return this.query(args.path, args.uuid, args.maxDepth);
             case 'list': return this.list(args.filter);
             case 'instantiate': return this.instantiate(args);
             case 'create': return this.create(args.nodeUuid, args.path);
@@ -82,6 +97,109 @@ export class PrefabTools implements ToolExecutor {
             case 'restore': return this.restore(args.nodeUuid);
             default: return { success: false, error: `Unknown prefab tool: ${toolName}` };
         }
+    }
+
+    // === Query: read prefab file and parse hierarchy ===
+
+    private async query(dbPath?: string, uuid?: string, maxDepth: number = 10): Promise<ToolResponse> {
+        try {
+            // Resolve asset info from path or uuid
+            let assetInfo: any;
+            if (uuid) {
+                assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', uuid);
+            } else if (dbPath) {
+                assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', dbPath);
+            } else {
+                return { success: false, error: 'Provide either "path" (db:// path) or "uuid"' };
+            }
+
+            if (!assetInfo) {
+                return { success: false, error: `Prefab not found: ${dbPath || uuid}` };
+            }
+
+            // Read the .prefab file (JSON array)
+            const filePath = assetInfo.file || assetInfo.source;
+            if (!filePath || !fs.existsSync(filePath)) {
+                return { success: false, error: `Prefab source file not accessible: ${filePath}` };
+            }
+
+            const content = fs.readFileSync(filePath, 'utf8');
+            const data: any[] = JSON.parse(content);
+
+            if (!Array.isArray(data) || data.length === 0) {
+                return { success: false, error: 'Invalid prefab format: expected JSON array' };
+            }
+
+            // Find root: cc.Prefab entry points to root node via data.__id__
+            const prefabEntry = data.find((item: any) => item.__type__ === 'cc.Prefab');
+            const rootNodeIdx = prefabEntry?.data?.__id__ ?? 1; // fallback to index 1
+
+            // Build hierarchy tree
+            const tree = this.buildNodeTree(data, rootNodeIdx, 0, maxDepth);
+
+            return {
+                success: true,
+                data: {
+                    name: assetInfo.name || prefabEntry?._name,
+                    uuid: assetInfo.uuid,
+                    url: assetInfo.url,
+                    totalObjects: data.length,
+                    hierarchy: tree,
+                },
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    /** Recursively build node tree from prefab JSON array */
+    private buildNodeTree(data: any[], nodeIdx: number, depth: number, maxDepth: number): any {
+        if (nodeIdx < 0 || nodeIdx >= data.length || depth > maxDepth) return null;
+        const node = data[nodeIdx];
+        if (!node) return null;
+
+        // Extract components
+        const components: string[] = [];
+        if (node._components) {
+            for (const ref of node._components) {
+                const compIdx = ref?.__id__;
+                if (compIdx != null && data[compIdx]) {
+                    components.push(data[compIdx].__type__ || 'unknown');
+                }
+            }
+        }
+
+        // Extract basic properties
+        const result: any = {
+            name: node._name || 'unnamed',
+            active: node._active !== false,
+        };
+
+        if (components.length > 0) {
+            result.components = components;
+        }
+
+        // Position (if non-zero)
+        if (node._lpos && (node._lpos.x || node._lpos.y || node._lpos.z)) {
+            result.position = { x: node._lpos.x, y: node._lpos.y, z: node._lpos.z };
+        }
+
+        // Recurse children
+        if (node._children && node._children.length > 0) {
+            const children: any[] = [];
+            for (const childRef of node._children) {
+                const childIdx = childRef?.__id__;
+                if (childIdx != null) {
+                    const child = this.buildNodeTree(data, childIdx, depth + 1, maxDepth);
+                    if (child) children.push(child);
+                }
+            }
+            if (children.length > 0) {
+                result.children = children;
+            }
+        }
+
+        return result;
     }
 
     private async list(filter?: string): Promise<ToolResponse> {
