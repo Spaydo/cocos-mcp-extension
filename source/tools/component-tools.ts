@@ -38,6 +38,7 @@ export class ComponentTools implements ToolExecutor {
                     properties: {
                         nodeUuid: { type: 'string' },
                         componentType: { type: 'string', description: 'Specific component type for detailed info' },
+                        verbose: { type: 'boolean', description: 'Include readonly props and default values' },
                     },
                     required: ['nodeUuid'],
                 },
@@ -84,8 +85,13 @@ export class ComponentTools implements ToolExecutor {
             },
             {
                 name: 'list_types',
-                description: 'List all available component types that can be added to nodes',
-                inputSchema: { type: 'object', properties: {} },
+                description: 'List all available component types. Use filter to narrow results (e.g. "UI", "Sprite", "Physics")',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Substring filter for class names (case-insensitive)' },
+                    },
+                },
             },
             {
                 name: 'query_detail',
@@ -114,8 +120,13 @@ export class ComponentTools implements ToolExecutor {
             },
             {
                 name: 'list_all',
-                description: 'List all registered components with details (name, cid, script path, asset UUID)',
-                inputSchema: { type: 'object', properties: {} },
+                description: 'List all registered components with details. Use filter to narrow results',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Substring filter for component names (case-insensitive)' },
+                    },
+                },
             },
         ];
     }
@@ -124,13 +135,13 @@ export class ComponentTools implements ToolExecutor {
         switch (toolName) {
             case 'add': return this.addComponent(args.nodeUuid, args.componentType);
             case 'remove': return this.removeComponent(args.nodeUuid, args.componentType);
-            case 'query': return this.queryComponents(args.nodeUuid, args.componentType);
+            case 'query': return this.queryComponents(args.nodeUuid, args.componentType, !!args.verbose);
             case 'set_property': return this.setProperty(args);
             case 'reset': return this.resetComponent(args.nodeUuid, args.componentType);
-            case 'list_types': return this.listTypes();
+            case 'list_types': return this.listTypes(args.filter);
             case 'query_detail': return this.queryDetail(args.componentUuid);
             case 'execute_method': return this.executeMethod(args.uuid, args.componentType, args.method, args.args);
-            case 'list_all': return this.listAll();
+            case 'list_all': return this.listAll(args.filter);
             default: return { success: false, error: `Unknown component tool: ${toolName}` };
         }
     }
@@ -191,7 +202,7 @@ export class ComponentTools implements ToolExecutor {
         }
     }
 
-    private async queryComponents(nodeUuid: string, componentType?: string): Promise<ToolResponse> {
+    private async queryComponents(nodeUuid: string, componentType?: string, verbose: boolean = false): Promise<ToolResponse> {
         try {
             const nodeData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
             if (!nodeData) {
@@ -220,7 +231,7 @@ export class ComponentTools implements ToolExecutor {
                 return { success: false, error: `Component ${componentType} not found. Available: ${available}` };
             }
 
-            const properties = this.extractProperties(target);
+            const properties = this.extractProperties(target, verbose);
             return {
                 success: true,
                 data: {
@@ -362,10 +373,18 @@ export class ComponentTools implements ToolExecutor {
         }
     }
 
-    private async listTypes(): Promise<ToolResponse> {
+    private async listTypes(filter?: string): Promise<ToolResponse> {
         try {
-            const classes: any = await (Editor.Message.request as any)('scene', 'query-classes');
-            return { success: true, data: classes };
+            const classes: any[] = await (Editor.Message.request as any)('scene', 'query-classes');
+            if (!filter) {
+                // Without filter, return names only (no metadata)
+                return { success: true, data: classes.map((c: any) => c.name || c) };
+            }
+            const lowerFilter = filter.toLowerCase();
+            const filtered = classes
+                .map((c: any) => c.name || c)
+                .filter((name: string) => name.toLowerCase().includes(lowerFilter));
+            return { success: true, data: filtered };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
@@ -377,7 +396,16 @@ export class ComponentTools implements ToolExecutor {
             if (!result) {
                 return { success: false, error: `Component not found: ${componentUuid}` };
             }
-            return { success: true, data: result };
+            // Return compact version instead of raw dump
+            const properties = this.extractProperties(result);
+            return {
+                success: true,
+                data: {
+                    type: result.type || result.__type__ || result.cid || 'unknown',
+                    enabled: result.enabled?.value ?? result.enabled ?? true,
+                    properties,
+                },
+            };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
@@ -400,10 +428,19 @@ export class ComponentTools implements ToolExecutor {
         }
     }
 
-    private async listAll(): Promise<ToolResponse> {
+    private async listAll(filter?: string): Promise<ToolResponse> {
         try {
-            const components: any = await (Editor.Message.request as any)('scene', 'query-components');
-            return { success: true, data: components };
+            const components: any[] = await (Editor.Message.request as any)('scene', 'query-components');
+            // Extract compact info: name, cid only
+            let results = (components || []).map((c: any) => ({
+                name: c.name || c.cid || 'unknown',
+                cid: c.cid,
+            }));
+            if (filter) {
+                const lowerFilter = filter.toLowerCase();
+                results = results.filter((c: any) => c.name.toLowerCase().includes(lowerFilter));
+            }
+            return { success: true, data: results };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
@@ -471,21 +508,42 @@ export class ComponentTools implements ToolExecutor {
         return hints[propertyType];
     }
 
-    private extractProperties(comp: any): Record<string, any> {
+    /** Extract compact properties: only visible, non-internal, non-default fields. */
+    private extractProperties(comp: any, verbose: boolean = false): Record<string, any> {
         const result: Record<string, any> = {};
-        const skipKeys = new Set(['__type__', 'type', 'cid', '_name', '_objFlags', 'node', '__prefab', 'fileId']);
+        const source = comp.value || comp;
+        const skipKeys = new Set([
+            '__type__', 'type', 'cid', '_name', '_objFlags', 'node', '__prefab', 'fileId',
+            'uuid', 'name', 'enabled', '_enabled', '__scriptAsset',
+        ]);
 
-        for (const [key, val] of Object.entries(comp)) {
+        for (const [key, meta] of Object.entries(source)) {
             if (skipKeys.has(key)) continue;
-            if (key.startsWith('_') && key !== '_enabled') continue;
+            if (key.startsWith('_')) continue;
+            if (key.startsWith('editor')) continue; // skip editor-only display duplicates
 
-            if (val && typeof val === 'object' && 'value' in (val as any)) {
-                result[key] = (val as any).value;
-            } else {
-                result[key] = val;
+            const m = meta as any;
+            if (!m || typeof m !== 'object') continue;
+            if (m.visible === false) continue;
+            if (!verbose && m.readonly === true) continue;
+            if (!verbose && 'value' in m && 'default' in m && this.valueEquals(m.value, m.default)) continue;
+
+            if ('value' in m) {
+                result[key] = m.value;
             }
         }
         return result;
+    }
+
+    private valueEquals(a: any, b: any): boolean {
+        if (a === b) return true;
+        if (a == null || b == null) return false;
+        if (typeof a !== typeof b) return false;
+        if (typeof a !== 'object') return false;
+        const ka = Object.keys(a);
+        const kb = Object.keys(b);
+        if (ka.length !== kb.length) return false;
+        return ka.every(k => this.valueEquals(a[k], b[k]));
     }
 
     private delay(ms: number): Promise<void> {

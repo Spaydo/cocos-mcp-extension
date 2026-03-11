@@ -14,8 +14,13 @@ export class PrefabTools implements ToolExecutor {
         return [
             {
                 name: 'list',
-                description: 'List all prefab assets in the project',
-                inputSchema: { type: 'object', properties: {} },
+                description: 'List all prefab assets in the project. Use filter to narrow results',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Substring filter for prefab names (case-insensitive)' },
+                    },
+                },
             },
             {
                 name: 'instantiate',
@@ -70,7 +75,7 @@ export class PrefabTools implements ToolExecutor {
 
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
-            case 'list': return this.list();
+            case 'list': return this.list(args.filter);
             case 'instantiate': return this.instantiate(args);
             case 'create': return this.create(args.nodeUuid, args.path);
             case 'create_empty': return this.createEmpty(args.name, args.path);
@@ -79,17 +84,21 @@ export class PrefabTools implements ToolExecutor {
         }
     }
 
-    private async list(): Promise<ToolResponse> {
+    private async list(filter?: string): Promise<ToolResponse> {
         try {
             const assets: any = await Editor.Message.request('asset-db', 'query-assets', { pattern: 'db://assets/**/*.prefab' });
             if (!assets || !Array.isArray(assets)) {
                 return { success: true, data: [] };
             }
-            const prefabs = assets.map((a: any) => ({
+            let prefabs = assets.map((a: any) => ({
                 name: a.name || a.url?.split('/').pop()?.replace('.prefab', ''),
                 uuid: a.uuid,
                 url: a.url || a.path,
             }));
+            if (filter) {
+                const lowerFilter = filter.toLowerCase();
+                prefabs = prefabs.filter((p: any) => p.name.toLowerCase().includes(lowerFilter));
+            }
             return { success: true, data: prefabs };
         } catch (err: any) {
             return { success: false, error: err.message };

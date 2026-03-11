@@ -16,6 +16,7 @@ export class NodeTools implements ToolExecutor {
                         name: { type: 'string', description: 'Search by name' },
                         listAll: { type: 'boolean', description: 'List all nodes (compact: uuid, name, parent)' },
                         includeComponents: { type: 'boolean', description: 'Include detailed component properties (only with uuid)' },
+                        verbose: { type: 'boolean', description: 'Include readonly props and default values in component details' },
                     },
                 },
             },
@@ -138,7 +139,7 @@ export class NodeTools implements ToolExecutor {
         if (args.uuid) {
             const result = await this.getNodeInfo(args.uuid);
             if (result.success && args.includeComponents) {
-                result.data.componentDetails = await this.getComponentDetails(args.uuid);
+                result.data.componentDetails = await this.getComponentDetails(args.uuid, !!args.verbose);
             }
             return result;
         }
@@ -151,32 +152,63 @@ export class NodeTools implements ToolExecutor {
         return { success: false, error: 'Provide uuid, name, or listAll' };
     }
 
-    private async getComponentDetails(nodeUuid: string): Promise<any[]> {
+    private async getComponentDetails(nodeUuid: string, verbose: boolean = false): Promise<any[]> {
         try {
             const nodeData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
             if (!nodeData || !nodeData.__comps__) return [];
 
-            return nodeData.__comps__.map((comp: any) => {
-                const info: any = {
-                    type: comp.type || comp.__type__ || comp.cid || 'unknown',
-                    enabled: comp.enabled?.value ?? comp.enabled ?? true,
-                    properties: {},
-                };
-                const skipKeys = new Set(['__type__', 'type', 'cid', '_name', '_objFlags', 'node', '__prefab', 'fileId']);
-                for (const [key, val] of Object.entries(comp)) {
-                    if (skipKeys.has(key)) continue;
-                    if (key.startsWith('_') && key !== '_enabled') continue;
-                    if (val && typeof val === 'object' && 'value' in (val as any)) {
-                        info.properties[key] = (val as any).value;
-                    } else {
-                        info.properties[key] = val;
-                    }
-                }
-                return info;
-            });
+            return nodeData.__comps__.map((comp: any) =>
+                this.extractCompact(comp, verbose)
+            );
         } catch {
             return [];
         }
+    }
+
+    /** Extract compact component info: only visible, non-internal, non-default properties. */
+    private extractCompact(comp: any, verbose: boolean = false): any {
+        const info: any = {
+            type: comp.type || comp.__type__ || comp.cid || 'unknown',
+            enabled: comp.enabled?.value ?? comp.enabled ?? true,
+            properties: {},
+        };
+
+        // comp.value holds per-property metadata; fall back to comp itself
+        const source = comp.value || comp;
+        const skipKeys = new Set([
+            '__type__', 'type', 'cid', '_name', '_objFlags', 'node', '__prefab', 'fileId',
+            'uuid', 'name', 'enabled', '_enabled', '__scriptAsset',
+        ]);
+
+        for (const [key, meta] of Object.entries(source)) {
+            if (skipKeys.has(key)) continue;
+            if (key.startsWith('_')) continue;
+            if (key.startsWith('editor')) continue; // skip editor-only display duplicates
+
+            const m = meta as any;
+            if (!m || typeof m !== 'object') continue;
+            if (m.visible === false) continue;
+            if (!verbose && m.readonly === true) continue;
+            if (!verbose && 'value' in m && 'default' in m && this.valueEquals(m.value, m.default)) continue;
+
+            if ('value' in m) {
+                info.properties[key] = m.value;
+            }
+        }
+
+        return info;
+    }
+
+    /** Deep equality check for property values. */
+    private valueEquals(a: any, b: any): boolean {
+        if (a === b) return true;
+        if (a == null || b == null) return false;
+        if (typeof a !== typeof b) return false;
+        if (typeof a !== 'object') return false;
+        const ka = Object.keys(a);
+        const kb = Object.keys(b);
+        if (ka.length !== kb.length) return false;
+        return ka.every(k => this.valueEquals(a[k], b[k]));
     }
 
     private async getNodeInfo(uuid: string): Promise<ToolResponse> {
@@ -508,14 +540,16 @@ export class NodeTools implements ToolExecutor {
             info.scale = { x: s.x ?? 1, y: s.y ?? 1, z: s.z ?? 1 };
         }
 
-        // Extract parent
+        // Extract parent (just UUID)
         if (data.parent) {
-            info.parent = data.parent;
+            const parentUuid = data.parent?.value?.uuid ?? data.parent?.uuid ?? data.parent;
+            if (parentUuid) info.parentUuid = typeof parentUuid === 'string' ? parentUuid : parentUuid;
         }
 
-        // Extract children
+        // Extract children (just UUIDs)
         if (data.children) {
-            info.children = Array.isArray(data.children) ? data.children : [];
+            const kids = Array.isArray(data.children) ? data.children : [];
+            info.children = kids.map((c: any) => c?.value?.uuid ?? c?.uuid ?? c);
         }
 
         // Extract layer

@@ -19,8 +19,13 @@ export class SceneTools implements ToolExecutor {
             },
             {
                 name: 'list',
-                description: 'List all scene files in the project',
-                inputSchema: { type: 'object', properties: {} },
+                description: 'List all scene files in the project. Use filter to narrow results',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Substring filter for scene names (case-insensitive)' },
+                    },
+                },
             },
             {
                 name: 'open',
@@ -67,8 +72,13 @@ export class SceneTools implements ToolExecutor {
             },
             {
                 name: 'classes',
-                description: 'List all registered component classes',
-                inputSchema: { type: 'object', properties: {} },
+                description: 'List all registered component classes. Use filter to narrow results (e.g. "UI", "Light", "Physics")',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        filter: { type: 'string', description: 'Substring filter for class names (case-insensitive)' },
+                    },
+                },
             },
             {
                 name: 'close',
@@ -96,14 +106,14 @@ export class SceneTools implements ToolExecutor {
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
             case 'query': return this.query(args);
-            case 'list': return this.list();
+            case 'list': return this.list(args.filter);
             case 'open': return this.open(args.path);
             case 'save': return this.save();
             case 'create': return this.create(args.name, args.path);
             case 'snapshot': return this.snapshot();
             case 'dirty': return this.dirty();
             case 'reload': return this.reload();
-            case 'classes': return this.classes();
+            case 'classes': return this.classes(args.filter);
             case 'close': return this.close();
             case 'save_as': return this.saveAs();
             case 'ready': return this.isReady();
@@ -141,17 +151,21 @@ export class SceneTools implements ToolExecutor {
         }
     }
 
-    private async list(): Promise<ToolResponse> {
+    private async list(filter?: string): Promise<ToolResponse> {
         try {
             const assets: any = await Editor.Message.request('asset-db', 'query-assets', { pattern: 'db://assets/**/*.scene' });
             if (!assets || !Array.isArray(assets)) {
                 return { success: true, data: [] };
             }
-            const scenes = assets.map((a: any) => ({
+            let scenes = assets.map((a: any) => ({
                 name: a.name || a.url?.split('/').pop()?.replace('.scene', ''),
                 uuid: a.uuid,
                 url: a.url || a.path,
             }));
+            if (filter) {
+                const lowerFilter = filter.toLowerCase();
+                scenes = scenes.filter((s: any) => s.name.toLowerCase().includes(lowerFilter));
+            }
             return { success: true, data: scenes };
         } catch (err: any) {
             return { success: false, error: err.message };
@@ -223,10 +237,17 @@ export class SceneTools implements ToolExecutor {
         }
     }
 
-    private async classes(): Promise<ToolResponse> {
+    private async classes(filter?: string): Promise<ToolResponse> {
         try {
-            const classes: any = await (Editor.Message.request as any)('scene', 'query-classes');
-            return { success: true, data: classes };
+            const classes: any[] = await (Editor.Message.request as any)('scene', 'query-classes');
+            if (!filter) {
+                return { success: true, data: classes.map((c: any) => c.name || c) };
+            }
+            const lowerFilter = filter.toLowerCase();
+            const filtered = classes
+                .map((c: any) => c.name || c)
+                .filter((name: string) => name.toLowerCase().includes(lowerFilter));
+            return { success: true, data: filtered };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

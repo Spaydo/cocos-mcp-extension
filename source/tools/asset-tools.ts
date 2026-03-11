@@ -13,6 +13,7 @@ export class AssetTools implements ToolExecutor {
                         pattern: { type: 'string', description: 'Glob pattern, e.g. db://assets/**/*.ts' },
                         uuid: { type: 'string', description: 'Asset UUID' },
                         url: { type: 'string', description: 'Asset db:// URL' },
+                        limit: { type: 'number', description: 'Max results for pattern query (default: 100)' },
                     },
                 },
             },
@@ -232,13 +233,17 @@ export class AssetTools implements ToolExecutor {
                 if (!assets || !Array.isArray(assets)) {
                     return { success: true, data: [] };
                 }
-                const results = assets.map((a: any) => ({
+                const limit = args.limit || 100;
+                const sliced = assets.slice(0, limit);
+                const results = sliced.map((a: any) => ({
                     name: a.name,
                     uuid: a.uuid,
                     url: a.url || a.path,
                     type: a.type,
                 }));
-                return { success: true, data: results };
+                const data: any = { total: assets.length, results };
+                if (assets.length > limit) data.truncated = true;
+                return { success: true, data };
             } catch (err: any) {
                 return { success: false, error: err.message };
             }
@@ -375,7 +380,16 @@ export class AssetTools implements ToolExecutor {
             if (!meta) {
                 return { success: false, error: `Asset meta not found: ${uuid}` };
             }
-            return { success: true, data: meta };
+            // Extract compact meta: skip internal fields
+            const data: any = {};
+            const skipKeys = new Set(['__type__', '__uuid__', 'files', 'displayName']);
+            for (const [key, val] of Object.entries(meta)) {
+                if (skipKeys.has(key)) continue;
+                if (key.startsWith('_')) continue;
+                data[key] = val;
+            }
+            if (meta.__uuid__) data.uuid = meta.__uuid__;
+            return { success: true, data };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
