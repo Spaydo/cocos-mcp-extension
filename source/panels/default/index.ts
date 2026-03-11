@@ -65,12 +65,12 @@ module.exports = Editor.Panel.define({
             if (this.$.statusText) this.$.statusText.textContent = t('panel.stopped');
         },
 
-        updateStatus(status: { running: boolean; port: number; tools: number }) {
+        updateStatus(status: { running: boolean; port: number; tools: number; actions: number }) {
             if (!this.$.statusDot || !this.$.statusText || !this.$.serverUrl) return;
 
             if (status.running) {
                 this.$.statusDot.className = 'status-dot running';
-                this.$.statusText.textContent = t('panel.running', status.tools);
+                this.$.statusText.textContent = t('panel.running', status.tools, status.actions);
                 this.$.serverUrl.textContent = `http://localhost:${status.port}/mcp`;
                 this.$.serverUrl.style.display = 'block';
             } else {

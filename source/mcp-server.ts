@@ -13,6 +13,7 @@ export class MCPServer {
     private settings: MCPServerSettings;
     private tools: Record<string, ToolExecutor> = {};
     private toolsList: ToolDefinition[] = [];
+    private actionCount: number = 0;
     private enableDebugLog: boolean = false;
 
     constructor(settings: MCPServerSettings) {
@@ -26,24 +27,119 @@ export class MCPServer {
         this.tools[category] = executor;
     }
 
+    /**
+     * Build consolidated tool list: one MCP tool per category with action parameter.
+     * AI sees 11 tools instead of 87, saving ~50% tokens on tool definitions.
+     * Per-tool settings filter individual actions within each category.
+     */
     setupTools(): void {
         this.toolsList = [];
+        this.actionCount = 0;
         const enabledCats = this.settings.enabledCategories || {};
         const enabledTools = this.settings.enabledTools || {};
+
         for (const [category, executor] of Object.entries(this.tools)) {
-            const tools = executor.getTools();
-            for (const tool of tools) {
+            // Skip entirely disabled categories
+            if (enabledCats[category] === false) continue;
+
+            const allTools = executor.getTools();
+
+            // Filter by per-tool settings
+            const activeTools = allTools.filter(tool => {
                 const fullName = `${category}_${tool.name}`;
-                // Per-tool override takes precedence, then category default
-                const enabled = enabledTools[fullName] !== undefined
+                return enabledTools[fullName] !== undefined
                     ? enabledTools[fullName]
-                    : enabledCats[category] !== false;
-                if (!enabled) continue;
-                this.toolsList.push({ ...tool, name: fullName });
+                    : true; // enabled by default within an enabled category
+            });
+
+            if (activeTools.length === 0) continue;
+
+            this.actionCount += activeTools.length;
+
+            // Build one consolidated MCP tool per category
+            this.toolsList.push({
+                name: category,
+                description: this.buildDescription(category, activeTools),
+                inputSchema: this.buildSchema(activeTools),
+            });
+        }
+
+        this.log(`Tools registered: ${this.toolsList.length} categories, ${this.actionCount} actions`);
+    }
+
+    // === Consolidated Tool Description ===
+
+    private static CATEGORY_DESCRIPTIONS: Record<string, string> = {
+        scene: 'Scene management (open, save, query hierarchy, etc.)',
+        node: 'Node/GameObject operations (create, delete, transform, etc.)',
+        component: 'Component management (add, remove, query, set properties, etc.)',
+        asset: 'Asset database operations (query, create, import, dependencies, etc.)',
+        prefab: 'Prefab operations (list, instantiate, create, restore)',
+        project: 'Project-level operations (info, build, preview, config)',
+        debug: 'Debugging utilities (logs, script execution)',
+        scene_view: 'Scene view controls (gizmo, camera, grid, view mode)',
+        editor: 'Editor environment (preferences, info, devices)',
+        reference_image: 'Reference image overlay management',
+        animation: 'Animation playback control',
+    };
+
+    private buildDescription(category: string, tools: ToolDefinition[]): string {
+        const catDesc = MCPServer.CATEGORY_DESCRIPTIONS[category] || category;
+        let desc = `${catDesc}\n\nActions:\n`;
+
+        for (const tool of tools) {
+            const params = this.formatActionParams(tool.inputSchema);
+            desc += params
+                ? `- ${tool.name}: ${tool.description} (${params})\n`
+                : `- ${tool.name}: ${tool.description}\n`;
+        }
+
+        return desc.trim();
+    }
+
+    private formatActionParams(schema: ToolDefinition['inputSchema']): string {
+        const props = schema.properties || {};
+        const required = schema.required || [];
+
+        const parts: string[] = [];
+        for (const [name, def] of Object.entries(props)) {
+            const isReq = required.includes(name);
+            const type = def.type || 'any';
+            parts.push(`${name}${isReq ? '' : '?'}: ${type}`);
+        }
+
+        return parts.join(', ');
+    }
+
+    // === Consolidated Tool Schema ===
+
+    private buildSchema(tools: ToolDefinition[]): ToolDefinition['inputSchema'] {
+        const actionEnum = tools.map(t => t.name);
+        const mergedProps: Record<string, any> = {
+            action: {
+                type: 'string',
+                enum: actionEnum,
+                description: 'The action to perform',
+            },
+        };
+
+        for (const tool of tools) {
+            const props = tool.inputSchema.properties || {};
+            for (const [propName, propDef] of Object.entries(props)) {
+                if (!mergedProps[propName]) {
+                    mergedProps[propName] = { ...propDef };
+                }
             }
         }
-        this.log(`Tools registered: ${this.toolsList.length}`);
+
+        return {
+            type: 'object',
+            properties: mergedProps,
+            required: ['action'],
+        };
     }
+
+    // === Tool Info for Panel UI (per-action granularity) ===
 
     private static CORE_CATEGORIES = ['scene', 'node', 'component', 'asset', 'prefab', 'project', 'debug'];
 
@@ -110,6 +206,10 @@ export class MCPServer {
         return this.toolsList.length;
     }
 
+    getActionCount(): number {
+        return this.actionCount;
+    }
+
     updateSettings(settings: MCPServerSettings): void {
         this.settings = settings;
         this.enableDebugLog = settings.enableDebugLog;
@@ -149,6 +249,7 @@ export class MCPServer {
         res.end(JSON.stringify({
             status: 'ok',
             tools: this.toolsList.length,
+            actions: this.actionCount,
             server: SERVER_INFO,
         }));
     }
@@ -271,27 +372,19 @@ export class MCPServer {
     // === Tool Execution ===
 
     private async executeToolCall(toolName: string, args: any): Promise<ToolResponse> {
-        // Match longest registered category name first (handles scene_view, reference_image, etc.)
-        let category = '';
-        let method = '';
-        const sortedCategories = Object.keys(this.tools).sort((a, b) => b.length - a.length);
-        for (const cat of sortedCategories) {
-            const prefix = cat + '_';
-            if (toolName.startsWith(prefix)) {
-                category = cat;
-                method = toolName.substring(prefix.length);
-                break;
-            }
+        // Consolidated approach: tool name = category, action in args
+        const executor = this.tools[toolName];
+        if (!executor) {
+            throw new Error(`Unknown tool: ${toolName}`);
         }
 
-        if (!category) {
-            throw new Error(`Invalid tool name format: ${toolName}`);
+        const action = args?.action;
+        if (!action) {
+            throw new Error(`Missing "action" parameter for tool "${toolName}". Check available actions in the tool description.`);
         }
 
-        const executor = this.tools[category];
-
-        this.log(`[MCP] Executing: ${category}.${method}`);
-        const result = await executor.execute(method, args);
+        this.log(`[MCP] Executing: ${toolName}.${action}`);
+        const result = await executor.execute(action, args);
         this.log(`[MCP] Result: ${result.success ? 'OK' : 'FAIL'}`);
 
         return result;

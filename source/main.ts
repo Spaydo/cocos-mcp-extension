@@ -85,6 +85,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
             running: mcpServer?.isRunning() ?? false,
             port: settings.port,
             tools: mcpServer?.getToolCount() ?? 0,
+            actions: mcpServer?.getActionCount() ?? 0,
             autoStart: settings.autoStart,
             enabledCategories: settings.enabledCategories,
             enabledTools: settings.enabledTools,

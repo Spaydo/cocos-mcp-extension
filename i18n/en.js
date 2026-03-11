@@ -18,7 +18,7 @@ module.exports = {
         'auto_start': 'Auto Start',
 
         // Status
-        'running': 'Running ({0} tools)',
+        'running': 'Running ({0} tools / {1} actions)',
         'stopped': 'Stopped',
 
         // Buttons

@@ -18,7 +18,7 @@ module.exports = {
         'auto_start': '自動啟動',
 
         // 狀態
-        'running': '運行中（{0} 個工具）',
+        'running': '運行中（{0} 個工具 / {1} 個功能）',
         'stopped': '已停止',
 
         // 按鈕
