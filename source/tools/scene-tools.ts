@@ -221,8 +221,12 @@ export class SceneTools implements ToolExecutor {
 
     private async dirty(): Promise<ToolResponse> {
         try {
-            const isDirty: any = await Editor.Message.request('scene', 'query-dirty');
-            return { success: true, data: { dirty: !!isDirty } };
+            // query-dirty may return boolean or { dirty: boolean }
+            const result: any = await Editor.Message.request('scene', 'query-dirty');
+            const dirty = typeof result === 'boolean' ? result
+                : typeof result === 'object' && result !== null ? !!result.dirty
+                : !!result;
+            return { success: true, data: { dirty } };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

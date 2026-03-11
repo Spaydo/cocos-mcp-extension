@@ -149,56 +149,73 @@ export class ComponentTools implements ToolExecutor {
     // === Tool Implementations ===
 
     private async addComponent(nodeUuid: string, componentType: string): Promise<ToolResponse> {
+        // Count components before
+        const beforeData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
+        if (!beforeData) return { success: false, error: `Node not found: ${nodeUuid}` };
+        const countBefore = beforeData?.__comps__?.length || 0;
+
+        // Try Editor API (may throw on conflict — that's fine, we verify below)
         try {
             await Editor.Message.request('scene', 'create-component', {
                 uuid: nodeUuid,
                 component: componentType,
             });
+        } catch { /* will verify below */ }
 
-            // Wait for editor to process
-            await this.delay(100);
+        await this.delay(300);
 
-            return {
-                success: true,
-                message: `Added ${componentType} to node ${nodeUuid}`,
-            };
-        } catch {
-            // Fallback: scene script
-            try {
-                const result: any = await Editor.Message.request('scene', 'execute-scene-script', {
-                    name: EXTENSION_NAME,
-                    method: 'addComponentToNode',
-                    args: [nodeUuid, componentType],
-                });
-                return result || { success: false, error: 'Failed to add component' };
-            } catch (err: any) {
-                return { success: false, error: err.message };
+        // Verify component was actually added (check count AND specific type)
+        const afterData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
+        const afterComps = afterData?.__comps__ || [];
+        if (afterComps.length > countBefore) {
+            const found = afterComps.some((c: any) => {
+                const t = c.type || c.__type__ || c.cid || '';
+                return t === componentType || t.includes(componentType);
+            });
+            if (found) {
+                return { success: true, message: `Added ${componentType} to node ${nodeUuid}` };
             }
         }
+
+        return {
+            success: false,
+            error: `Failed to add ${componentType}: may conflict with existing renderer or component on this node`,
+        };
     }
 
     private async removeComponent(nodeUuid: string, componentType: string): Promise<ToolResponse> {
-        try {
-            await Editor.Message.request('scene', 'remove-component', {
-                uuid: nodeUuid,
-                component: componentType,
-            });
+        // Find component info (including its own UUID)
+        const info = await this.findComponentInfo(nodeUuid, componentType);
+        if ('success' in info) return info as ToolResponse;
 
-            return {
-                success: true,
-                message: `Removed ${componentType} from node ${nodeUuid}`,
-            };
-        } catch {
-            try {
-                const result: any = await Editor.Message.request('scene', 'execute-scene-script', {
-                    name: EXTENSION_NAME,
-                    method: 'removeComponentFromNode',
-                    args: [nodeUuid, componentType],
-                });
-                return result || { success: false, error: 'Failed to remove component' };
-            } catch (err: any) {
-                return { success: false, error: err.message };
+        // Editor API expects component UUID, not node UUID
+        try {
+            if (info.uuid) {
+                await Editor.Message.request('scene', 'remove-component', { uuid: info.uuid });
             }
+            await this.delay(200);
+        } catch { /* will verify below */ }
+
+        // Verify removal
+        const check = await this.findComponentInfo(nodeUuid, componentType);
+        if ('success' in check) {
+            // Component no longer found = removed successfully
+            return { success: true, message: `Removed ${componentType} from node ${nodeUuid}` };
+        }
+
+        // Editor API failed — try scene script fallback
+        try {
+            const result: any = await Editor.Message.request('scene', 'execute-scene-script', {
+                name: EXTENSION_NAME,
+                method: 'removeComponentFromNode',
+                args: [nodeUuid, componentType],
+            });
+            if (result?.success) {
+                return { success: true, message: `Removed ${componentType} from node ${nodeUuid}` };
+            }
+            return result || { success: false, error: `Failed to remove ${componentType}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
         }
     }
 
@@ -212,10 +229,11 @@ export class ComponentTools implements ToolExecutor {
             const comps = nodeData.__comps__ || [];
 
             if (!componentType) {
-                // Return compact type list only
+                // Return compact type list only (include uuid for reference)
                 const types = comps.map((c: any) => ({
                     type: c.type || c.__type__ || c.cid || 'unknown',
                     enabled: c.enabled?.value ?? c.enabled ?? true,
+                    uuid: c.value?.uuid?.value || c.uuid?.value || c.uuid || undefined,
                 }));
                 return { success: true, data: { nodeUuid, components: types } };
             }
@@ -358,16 +376,54 @@ export class ComponentTools implements ToolExecutor {
         return compIndex;
     }
 
-    private async resetComponent(nodeUuid: string, componentType: string): Promise<ToolResponse> {
-        try {
-            const compIndex = await this.findComponentIndex(nodeUuid, componentType);
-            if (typeof compIndex === 'object') return compIndex;
+    /** Find component by type and return its index, UUID, and cid. */
+    private async findComponentInfo(nodeUuid: string, componentType: string): Promise<{ index: number; uuid: string; cid: string } | ToolResponse> {
+        const nodeData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
+        if (!nodeData) {
+            return { success: false, error: `Node not found: ${nodeUuid}` };
+        }
 
-            await (Editor.Message.request as any)('scene', 'reset-component', {
-                uuid: nodeUuid,
-                index: compIndex,
+        const comps = nodeData.__comps__ || [];
+        for (let i = 0; i < comps.length; i++) {
+            const c = comps[i];
+            const t = c.type || c.__type__ || c.cid || '';
+            if (t === componentType || t.includes(componentType)) {
+                // Try multiple paths to find component UUID
+                const uuid = c.value?.uuid?.value || c.uuid?.value || c.uuid || '';
+                return {
+                    index: i,
+                    uuid,
+                    cid: c.cid || c.__type__ || componentType,
+                };
+            }
+        }
+
+        const available = comps.map((c: any) => c.type || c.__type__ || c.cid).join(', ');
+        return { success: false, error: `Component ${componentType} not found. Available: ${available}` };
+    }
+
+    private async resetComponent(nodeUuid: string, componentType: string): Promise<ToolResponse> {
+        // Find component info (including its own UUID)
+        const info = await this.findComponentInfo(nodeUuid, componentType);
+        if ('success' in info) return info as ToolResponse;
+
+        // Editor API expects component UUID
+        try {
+            if (info.uuid) {
+                await Editor.Message.request('scene', 'reset-component', { uuid: info.uuid });
+                await this.delay(200);
+                return { success: true, message: `Reset ${componentType} on node ${nodeUuid}` };
+            }
+        } catch { /* try fallback */ }
+
+        // Fallback: scene script remove + re-add
+        try {
+            const result: any = await Editor.Message.request('scene', 'execute-scene-script', {
+                name: EXTENSION_NAME,
+                method: 'resetComponent',
+                args: [nodeUuid, componentType],
             });
-            return { success: true, message: `Reset ${componentType} on node ${nodeUuid}` };
+            return result || { success: false, error: `Failed to reset ${componentType}` };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
@@ -487,10 +543,14 @@ export class ComponentTools implements ToolExecutor {
                 return { value: { uuid: value }, type: this.getAssetTypeHint(propertyType) };
 
             case 'number':
-            case 'integer':
             case 'float':
-            case 'string':
+                return { value: Number(value), type: 'Float' };
+            case 'integer':
+                return { value: Math.round(Number(value)), type: 'Integer' };
             case 'boolean':
+                return { value: !!value, type: 'Boolean' };
+            case 'string':
+                return { value: String(value) };
             default:
                 return { value };
         }

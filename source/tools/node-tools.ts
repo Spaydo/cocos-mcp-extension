@@ -434,12 +434,44 @@ export class NodeTools implements ToolExecutor {
                     path: editorPath,
                     dump: { value: vecValue },
                 });
+            } else if (property === 'active') {
+                // active needs proper boolean parsing (string "false" must become false)
+                const boolVal = typeof value === 'string'
+                    ? value.toLowerCase() !== 'false' && value !== '0' && value !== ''
+                    : !!value;
+                await Editor.Message.request('scene', 'set-property', {
+                    uuid,
+                    path: 'active',
+                    dump: { value: boolVal, type: 'Boolean' },
+                });
             } else {
                 await Editor.Message.request('scene', 'set-property', {
                     uuid,
                     path: editorPath,
                     dump: { value },
                 });
+            }
+
+            await this.delay(100);
+
+            // Verify for properties that can silently fail
+            if (property === 'active' || property === 'name') {
+                const nodeData: any = await Editor.Message.request('scene', 'query-node', uuid);
+                const actual = nodeData?.[editorPath]?.value;
+                // For active, compare as booleans (value may be string "false")
+                const expected = property === 'active'
+                    ? (typeof value === 'string' ? value.toLowerCase() !== 'false' && value !== '0' && value !== '' : !!value)
+                    : value;
+                if (actual !== expected) {
+                    // Editor API failed — use scene script fallback
+                    const result: any = await Editor.Message.request('scene', 'execute-scene-script', {
+                        name: EXTENSION_NAME,
+                        method: 'setNodeProperty',
+                        args: [uuid, property, expected],
+                    });
+                    if (result?.success) return result;
+                    return { success: false, error: `Failed to set ${property}` };
+                }
             }
 
             return { success: true, message: `Set ${property} on ${uuid}` };
@@ -456,6 +488,10 @@ export class NodeTools implements ToolExecutor {
                 return { success: false, error: err.message };
             }
         }
+    }
+
+    private delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     private async moveNode(uuid: string, parentUuid: string, siblingIndex?: number): Promise<ToolResponse> {

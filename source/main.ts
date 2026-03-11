@@ -48,6 +48,9 @@ function unhookConsole() {
 const editorLogHandler = (msg: any) => addLog('editor-log', String(msg));
 const editorWarnHandler = (msg: any) => addLog('editor-warn', String(msg));
 const editorErrorHandler = (msg: any) => addLog('editor-error', String(msg));
+const sceneLogHandler = (msg: any) => addLog('scene-log', String(msg));
+const sceneWarnHandler = (msg: any) => addLog('scene-warn', String(msg));
+const sceneErrorHandler = (msg: any) => addLog('scene-error', String(msg));
 
 /** Get the detected Cocos Creator editor version */
 export function getEditorVersion(): string {
@@ -112,12 +115,21 @@ export function load() {
     // 1. Hook console to capture logs
     hookConsole();
 
-    // 2. Listen for editor-level broadcast messages
+    // 2. Listen for editor-level broadcast messages (multiple channels for coverage)
     const msg = Editor.Message as any;
     if (msg.addBroadcastListener) {
+        // Editor console events
         msg.addBroadcastListener('log:log', editorLogHandler);
         msg.addBroadcastListener('log:warn', editorWarnHandler);
         msg.addBroadcastListener('log:error', editorErrorHandler);
+        // Scene-level events
+        msg.addBroadcastListener('scene:log', sceneLogHandler);
+        msg.addBroadcastListener('scene:warn', sceneWarnHandler);
+        msg.addBroadcastListener('scene:error', sceneErrorHandler);
+        // Console panel events (alternate naming)
+        msg.addBroadcastListener('console:log', editorLogHandler);
+        msg.addBroadcastListener('console:warn', editorWarnHandler);
+        msg.addBroadcastListener('console:error', editorErrorHandler);
     }
 
     // 3. Detect editor version
@@ -160,6 +172,12 @@ export function unload() {
         msg.removeBroadcastListener('log:log', editorLogHandler);
         msg.removeBroadcastListener('log:warn', editorWarnHandler);
         msg.removeBroadcastListener('log:error', editorErrorHandler);
+        msg.removeBroadcastListener('scene:log', sceneLogHandler);
+        msg.removeBroadcastListener('scene:warn', sceneWarnHandler);
+        msg.removeBroadcastListener('scene:error', sceneErrorHandler);
+        msg.removeBroadcastListener('console:log', editorLogHandler);
+        msg.removeBroadcastListener('console:warn', editorWarnHandler);
+        msg.removeBroadcastListener('console:error', editorErrorHandler);
     }
 
     if (mcpServer) {

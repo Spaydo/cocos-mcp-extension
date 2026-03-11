@@ -24,12 +24,14 @@ export class DebugTools implements ToolExecutor {
         return [
             {
                 name: 'get_logs',
-                description: 'Get recent console logs from the extension',
+                description: 'Get recent console/editor logs. Use errors_only=true after operations to check for failures. Use since (ISO timestamp) for efficient polling',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         count: { type: 'number', description: 'Number of recent logs (default 20)' },
-                        level: { type: 'string', description: 'Filter by level: log, warn, error' },
+                        level: { type: 'string', description: 'Filter by level: log, warn, error, editor-log, editor-warn, editor-error' },
+                        errors_only: { type: 'boolean', description: 'Show only warn/error level logs' },
+                        since: { type: 'string', description: 'ISO timestamp — return only logs after this time' },
                     },
                 },
             },
@@ -54,20 +56,26 @@ export class DebugTools implements ToolExecutor {
 
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
-            case 'get_logs': return this.getLogs(args?.count, args?.level);
+            case 'get_logs': return this.getLogs(args?.count, args?.level, args?.errors_only, args?.since);
             case 'clear_logs': return this.clearLogs();
             case 'execute_script': return this.executeScript(args.code);
             default: return { success: false, error: `Unknown debug tool: ${toolName}` };
         }
     }
 
-    private async getLogs(count: number = 20, level?: string): Promise<ToolResponse> {
-        let logs = logBuffer;
+    private async getLogs(count: number = 20, level?: string, errorsOnly?: boolean, since?: string): Promise<ToolResponse> {
+        let logs = [...logBuffer];
+        if (since) {
+            logs = logs.filter(l => l.timestamp > since);
+        }
         if (level) {
             logs = logs.filter(l => l.level === level);
         }
+        if (errorsOnly) {
+            logs = logs.filter(l => l.level.includes('warn') || l.level.includes('error'));
+        }
         const result = logs.slice(-count);
-        return { success: true, data: { count: result.length, logs: result } };
+        return { success: true, data: { count: result.length, total: logBuffer.length, logs: result } };
     }
 
     private async clearLogs(): Promise<ToolResponse> {

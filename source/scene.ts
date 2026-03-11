@@ -263,6 +263,32 @@ export const methods: { [key: string]: (...args: any) => any } = {
         }
     },
 
+    resetComponent(nodeUuid: string, componentType: string) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+            const node = requireNode(scene, nodeUuid);
+
+            const ComponentClass = cc.js.getClassByName(componentType);
+            if (!ComponentClass) {
+                return { success: false, error: `Component class not found: ${componentType}` };
+            }
+
+            const oldComp = node.getComponent(ComponentClass);
+            if (!oldComp) {
+                return { success: false, error: `Component ${componentType} not found on node` };
+            }
+
+            // Remove and re-add to reset to defaults
+            node.removeComponent(oldComp);
+            node.addComponent(ComponentClass);
+
+            return { success: true, message: `Reset ${componentType} on node ${nodeUuid}` };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
     getComponentInfo(nodeUuid: string, componentType?: string) {
         try {
             const scene = requireScene();
