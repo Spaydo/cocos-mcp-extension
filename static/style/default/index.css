@@ -68,8 +68,8 @@
     user-select: all;
 }
 
-/* Tool Categories */
-.category-actions {
+/* Tools Section */
+.tools-actions {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -96,56 +96,113 @@
     margin-left: auto;
 }
 
-.category-group {
-    margin-bottom: 8px;
+.tools-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
 }
 
+/* Core / Advanced group label */
 .category-group-label {
     font-size: 11px;
     color: #888;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 4px;
+    margin: 10px 0 4px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #333;
 }
 
-.category-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+.category-group-label:first-child {
+    margin-top: 0;
 }
 
-.category-row {
+/* Category header row */
+.tool-category-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 3px 6px;
+    justify-content: space-between;
+    padding: 4px 6px;
+    margin-top: 6px;
+    background: #262626;
     border-radius: 3px;
 }
 
-.category-row:hover {
+.tool-category-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-category-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ddd;
+}
+
+.tool-category-count {
+    font-size: 10px;
+    color: #888;
+    background: #333;
+    padding: 1px 6px;
+    border-radius: 8px;
+}
+
+.tool-category-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.tool-category-action {
+    font-size: 10px;
+    color: #7cb3f5;
+    cursor: pointer;
+    user-select: none;
+}
+
+.tool-category-action:hover {
+    color: #a8d0ff;
+    text-decoration: underline;
+}
+
+/* Individual tool row */
+.tool-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 3px 6px 3px 16px;
+    border-radius: 3px;
+    min-height: 22px;
+}
+
+.tool-row:hover {
     background: #2a2a2a;
 }
 
-.category-name {
-    flex: 1;
-    font-size: 12px;
+.tool-row ui-checkbox {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.tool-name {
+    flex-shrink: 0;
+    width: 200px;
+    font-size: 11px;
+    font-family: monospace;
     color: #ccc;
-}
-
-.category-tool-count {
-    font-size: 11px;
-    color: #777;
-    min-width: 20px;
-    text-align: right;
-}
-
-.category-desc {
-    font-size: 11px;
-    color: #666;
-    max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.tool-desc {
+    flex: 1;
+    font-size: 11px;
+    color: #888;
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
 }
 
 /* Logs */

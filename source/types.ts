@@ -9,6 +9,7 @@ export interface MCPServerSettings {
     autoStart: boolean;
     enableDebugLog: boolean;
     enabledCategories: Record<string, boolean>;
+    enabledTools: Record<string, boolean>;
 }
 
 export const DEFAULT_ENABLED_CATEGORIES: Record<string, boolean> = {

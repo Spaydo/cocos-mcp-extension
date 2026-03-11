@@ -452,11 +452,10 @@ export class NodeTools implements ToolExecutor {
 
     private async duplicateNode(uuid: string): Promise<ToolResponse> {
         try {
-            await Editor.Message.request('scene', 'copy-node', [uuid]);
-            const result: any = await (Editor.Message.request as any)('scene', 'paste-node');
+            const result: any = await Editor.Message.request('scene', 'duplicate-node', [uuid]);
             return {
                 success: true,
-                data: result,
+                data: { duplicatedUuids: result },
                 message: `Node duplicated: ${uuid}`,
             };
         } catch (err: any) {
@@ -466,21 +465,7 @@ export class NodeTools implements ToolExecutor {
 
     private async resetTransform(uuid: string): Promise<ToolResponse> {
         try {
-            await Editor.Message.request('scene', 'set-property', {
-                uuid,
-                path: 'position',
-                dump: { value: { x: 0, y: 0, z: 0 } },
-            });
-            await Editor.Message.request('scene', 'set-property', {
-                uuid,
-                path: 'euler',
-                dump: { value: { x: 0, y: 0, z: 0 } },
-            });
-            await Editor.Message.request('scene', 'set-property', {
-                uuid,
-                path: 'scale',
-                dump: { value: { x: 1, y: 1, z: 1 } },
-            });
+            await Editor.Message.request('scene', 'reset-node', { uuid });
             return { success: true, message: `Transform reset on node ${uuid}` };
         } catch (err: any) {
             return { success: false, error: err.message };

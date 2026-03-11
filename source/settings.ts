@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS: MCPServerSettings = {
     autoStart: false,
     enableDebugLog: false,
     enabledCategories: { ...DEFAULT_ENABLED_CATEGORIES },
+    enabledTools: {},
 };
 
 function getSettingsDir(): string {
@@ -33,6 +34,7 @@ export function readSettings(): MCPServerSettings {
                 ...DEFAULT_SETTINGS,
                 ...saved,
                 enabledCategories: { ...DEFAULT_ENABLED_CATEGORIES, ...saved.enabledCategories },
+                enabledTools: saved.enabledTools || {},
             };
         }
     } catch (err) {

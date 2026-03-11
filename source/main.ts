@@ -87,11 +87,12 @@ export const methods: { [key: string]: (...any: any) => any } = {
             tools: mcpServer?.getToolCount() ?? 0,
             autoStart: settings.autoStart,
             enabledCategories: settings.enabledCategories,
+            enabledTools: settings.enabledTools,
         };
     },
 
     getCategories() {
-        return mcpServer?.getRegisteredCategories() ?? [];
+        return mcpServer?.getAllToolsInfo() ?? [];
     },
 
     updateSettings(settings: MCPServerSettings): { success: boolean } {

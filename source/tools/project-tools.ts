@@ -48,6 +48,31 @@ export class ProjectTools implements ToolExecutor {
                     required: ['action'],
                 },
             },
+            {
+                name: 'query_config',
+                description: 'Read a project-level configuration value',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        protocol: { type: 'string', description: 'Config protocol, e.g. general, physics, layer' },
+                        key: { type: 'string', description: 'Config key to read (optional, returns all if omitted)' },
+                    },
+                    required: ['protocol'],
+                },
+            },
+            {
+                name: 'set_config',
+                description: 'Set a project-level configuration value',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        protocol: { type: 'string', description: 'Config protocol' },
+                        key: { type: 'string', description: 'Config key to set' },
+                        value: { description: 'Value to set' },
+                    },
+                    required: ['protocol', 'key', 'value'],
+                },
+            },
         ];
     }
 
@@ -57,6 +82,8 @@ export class ProjectTools implements ToolExecutor {
             case 'refresh': return this.refresh(args?.path);
             case 'build': return this.build(args.platform, args.buildPath);
             case 'preview': return this.preview(args.action);
+            case 'query_config': return this.queryConfig(args.protocol, args.key);
+            case 'set_config': return this.setConfig(args.protocol, args.key, args.value);
             default: return { success: false, error: `Unknown project tool: ${toolName}` };
         }
     }
@@ -106,6 +133,24 @@ export class ProjectTools implements ToolExecutor {
                 return { success: true, message: 'Preview stopped' };
             }
             return { success: false, error: 'Action must be "start" or "stop"' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryConfig(protocol: string, key?: string): Promise<ToolResponse> {
+        try {
+            const value: any = await (Editor.Message.request as any)('project', 'query-config', protocol, key);
+            return { success: true, data: { protocol, key: key || '(all)', value } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async setConfig(protocol: string, key: string, value: any): Promise<ToolResponse> {
+        try {
+            await (Editor.Message.request as any)('project', 'set-config', protocol, key, value);
+            return { success: true, message: `Project config set: ${protocol}.${key} = ${JSON.stringify(value)}` };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

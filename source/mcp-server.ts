@@ -28,27 +28,38 @@ export class MCPServer {
 
     setupTools(): void {
         this.toolsList = [];
-        const enabled = this.settings.enabledCategories || {};
+        const enabledCats = this.settings.enabledCategories || {};
+        const enabledTools = this.settings.enabledTools || {};
         for (const [category, executor] of Object.entries(this.tools)) {
-            // Skip disabled categories (default to enabled if not in settings)
-            if (enabled[category] === false) continue;
             const tools = executor.getTools();
             for (const tool of tools) {
-                this.toolsList.push({
-                    ...tool,
-                    name: `${category}_${tool.name}`,
-                });
+                const fullName = `${category}_${tool.name}`;
+                // Per-tool override takes precedence, then category default
+                const enabled = enabledTools[fullName] !== undefined
+                    ? enabledTools[fullName]
+                    : enabledCats[category] !== false;
+                if (!enabled) continue;
+                this.toolsList.push({ ...tool, name: fullName });
             }
         }
         this.log(`Tools registered: ${this.toolsList.length}`);
     }
 
-    getRegisteredCategories(): { category: string; toolCount: number; enabled: boolean }[] {
-        const enabled = this.settings.enabledCategories || {};
+    private static CORE_CATEGORIES = ['scene', 'node', 'component', 'asset', 'prefab', 'project', 'debug'];
+
+    getAllToolsInfo(): { category: string; isCore: boolean; tools: { name: string; description: string; enabled: boolean }[] }[] {
+        const enabledCats = this.settings.enabledCategories || {};
+        const enabledTools = this.settings.enabledTools || {};
         return Object.entries(this.tools).map(([category, executor]) => ({
             category,
-            toolCount: executor.getTools().length,
-            enabled: enabled[category] !== false,
+            isCore: MCPServer.CORE_CATEGORIES.includes(category),
+            tools: executor.getTools().map(tool => {
+                const fullName = `${category}_${tool.name}`;
+                const enabled = enabledTools[fullName] !== undefined
+                    ? enabledTools[fullName]
+                    : enabledCats[category] !== false;
+                return { name: fullName, description: tool.description, enabled };
+            }),
         }));
     }
 

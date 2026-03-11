@@ -70,6 +70,26 @@ export class SceneTools implements ToolExecutor {
                 description: 'List all registered component classes',
                 inputSchema: { type: 'object', properties: {} },
             },
+            {
+                name: 'close',
+                description: 'Close the current scene',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'save_as',
+                description: 'Save the current scene as a new scene file',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'ready',
+                description: 'Check if the scene editor is ready',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'bounds',
+                description: 'Get the bounding box of the current scene view',
+                inputSchema: { type: 'object', properties: {} },
+            },
         ];
     }
 
@@ -84,6 +104,10 @@ export class SceneTools implements ToolExecutor {
             case 'dirty': return this.dirty();
             case 'reload': return this.reload();
             case 'classes': return this.classes();
+            case 'close': return this.close();
+            case 'save_as': return this.saveAs();
+            case 'ready': return this.isReady();
+            case 'bounds': return this.queryBounds();
             default: return { success: false, error: `Unknown scene tool: ${toolName}` };
         }
     }
@@ -203,6 +227,42 @@ export class SceneTools implements ToolExecutor {
         try {
             const classes: any = await (Editor.Message.request as any)('scene', 'query-classes');
             return { success: true, data: classes };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async close(): Promise<ToolResponse> {
+        try {
+            const result: any = await (Editor.Message.request as any)('scene', 'close-scene');
+            return { success: true, data: { closed: !!result }, message: 'Scene closed' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async saveAs(): Promise<ToolResponse> {
+        try {
+            const result: any = await (Editor.Message.request as any)('scene', 'save-as-scene');
+            return { success: true, data: { savedPath: result }, message: result ? `Scene saved as: ${result}` : 'Save as cancelled' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async isReady(): Promise<ToolResponse> {
+        try {
+            const ready: any = await (Editor.Message.request as any)('scene', 'query-is-ready');
+            return { success: true, data: { ready: !!ready } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryBounds(): Promise<ToolResponse> {
+        try {
+            const bounds: any = await (Editor.Message.request as any)('scene', 'query-scene-bounds');
+            return { success: true, data: bounds };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

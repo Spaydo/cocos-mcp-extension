@@ -85,6 +85,87 @@ export class AssetTools implements ToolExecutor {
                     },
                 },
             },
+            {
+                name: 'copy',
+                description: 'Copy an asset to a new location',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        source: { type: 'string', description: 'Source db:// path' },
+                        target: { type: 'string', description: 'Target db:// path' },
+                    },
+                    required: ['source', 'target'],
+                },
+            },
+            {
+                name: 'save',
+                description: 'Save/overwrite content of an existing asset',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        url: { type: 'string', description: 'db:// path of the asset' },
+                        content: { type: 'string', description: 'New file content' },
+                    },
+                    required: ['url', 'content'],
+                },
+            },
+            {
+                name: 'query_meta',
+                description: 'Get asset meta information (import settings, sub-assets config)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Asset UUID or db:// URL' },
+                    },
+                    required: ['uuid'],
+                },
+            },
+            {
+                name: 'query_users',
+                description: 'Find which assets or scripts reference this asset (reverse dependency)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Asset UUID or db:// URL' },
+                        type: { type: 'string', description: 'Query type: asset, script, or all (default: asset)' },
+                    },
+                    required: ['uuid'],
+                },
+            },
+            {
+                name: 'query_dependencies',
+                description: 'Find which assets this asset depends on (forward dependency)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Asset UUID or db:// URL' },
+                        type: { type: 'string', description: 'Query type: asset, script, or all (default: asset)' },
+                    },
+                    required: ['uuid'],
+                },
+            },
+            {
+                name: 'open',
+                description: 'Open an asset in the editor (e.g. open a script in code editor, a scene in scene editor)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Asset UUID or db:// URL' },
+                    },
+                    required: ['uuid'],
+                },
+            },
+            {
+                name: 'reimport',
+                description: 'Re-import an asset (regenerate compiled/library files)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Asset UUID or db:// URL' },
+                    },
+                    required: ['uuid'],
+                },
+            },
         ];
     }
 
@@ -97,6 +178,13 @@ export class AssetTools implements ToolExecutor {
             case 'import': return this.importAsset(args.source, args.target);
             case 'info': return this.assetInfo(args);
             case 'query_uuid': return this.queryUuid(args);
+            case 'copy': return this.copyAsset(args.source, args.target);
+            case 'save': return this.saveAsset(args.url, args.content);
+            case 'query_meta': return this.queryMeta(args.uuid);
+            case 'query_users': return this.queryUsers(args.uuid, args.type);
+            case 'query_dependencies': return this.queryDependencies(args.uuid, args.type);
+            case 'open': return this.openAsset(args.uuid);
+            case 'reimport': return this.reimportAsset(args.uuid);
             default: return { success: false, error: `Unknown asset tool: ${toolName}` };
         }
     }
@@ -192,9 +280,6 @@ export class AssetTools implements ToolExecutor {
 
     private async importAsset(source: string, target: string): Promise<ToolResponse> {
         try {
-            const { readFileSync } = require('fs');
-            const content = readFileSync(source);
-            const base64 = content.toString('base64');
             const result: any = await (Editor.Message.request as any)('asset-db', 'import-asset', source, target);
             return {
                 success: true,
@@ -256,5 +341,79 @@ export class AssetTools implements ToolExecutor {
         }
 
         return { success: false, error: 'Provide url or uuid' };
+    }
+
+    private async copyAsset(source: string, target: string): Promise<ToolResponse> {
+        try {
+            const result: any = await Editor.Message.request('asset-db', 'copy-asset', source, target);
+            return {
+                success: true,
+                data: { uuid: result?.uuid, url: target },
+                message: `Asset copied: ${source} → ${target}`,
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async saveAsset(url: string, content: string): Promise<ToolResponse> {
+        try {
+            const result: any = await Editor.Message.request('asset-db', 'save-asset', url, content);
+            return {
+                success: true,
+                data: { uuid: result?.uuid, url },
+                message: `Asset saved: ${url}`,
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryMeta(uuid: string): Promise<ToolResponse> {
+        try {
+            const meta: any = await Editor.Message.request('asset-db', 'query-asset-meta', uuid);
+            if (!meta) {
+                return { success: false, error: `Asset meta not found: ${uuid}` };
+            }
+            return { success: true, data: meta };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryUsers(uuid: string, type?: string): Promise<ToolResponse> {
+        try {
+            const users: any = await (Editor.Message.request as any)('asset-db', 'query-asset-users', uuid, type || 'asset');
+            return { success: true, data: { uuid, referencedBy: users || [] } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryDependencies(uuid: string, type?: string): Promise<ToolResponse> {
+        try {
+            const deps: any = await (Editor.Message.request as any)('asset-db', 'query-asset-dependencies', uuid, type || 'asset');
+            return { success: true, data: { uuid, dependsOn: deps || [] } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async openAsset(uuid: string): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('asset-db', 'open-asset', uuid);
+            return { success: true, message: `Asset opened: ${uuid}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async reimportAsset(uuid: string): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('asset-db', 'reimport-asset', uuid);
+            return { success: true, message: `Asset re-imported: ${uuid}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
     }
 }

@@ -35,16 +35,16 @@ Verify connection:
 
 ```bash
 curl http://localhost:3000/health
-# Expected response: {"status":"ok","tools":68,...}
+# Expected response: {"status":"ok","tools":87,...}
 ```
 
 ## Supported Tools
 
-68 tools across 11 categories (7 core + 4 advanced). MCP tool names follow the `category_action` format.
+87 tools across 11 categories (7 core + 4 advanced). MCP tool names follow the `category_action` format.
 
 You can enable/disable tool categories in the panel's **Tool Categories** section to reduce AI token usage.
 
-### Scene — 9 tools
+### Scene — 13 tools
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -57,6 +57,10 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `scene_dirty` | Check if scene has unsaved changes |
 | `scene_reload` | Soft reload the current scene |
 | `scene_classes` | List all registered component classes |
+| `scene_close` | Close the current scene |
+| `scene_save_as` | Save the current scene as a new file |
+| `scene_ready` | Check if the scene editor is ready |
+| `scene_bounds` | Get the bounding box of the scene view |
 
 ### Node — 8 tools
 
@@ -71,7 +75,7 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `node_reset_transform` | Reset node position/rotation/scale to defaults |
 | `node_find_by_asset` | Find all nodes using a specific asset |
 
-### Component — 6 tools
+### Component — 9 tools
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -81,8 +85,11 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `component_set_property` | Set component property (supports batch mode, node, color, vec3, etc.) |
 | `component_reset` | Reset a component to default values |
 | `component_list_types` | List all available component types |
+| `component_query_detail` | Query a single component by UUID for full details |
+| `component_execute_method` | Execute a method on a component at runtime |
+| `component_list_all` | List all registered components (with name, cid, script path, asset UUID) |
 
-### Asset — 7 tools
+### Asset — 14 tools
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -93,6 +100,13 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `asset_import` | Import an external file as an asset |
 | `asset_info` | Get detailed asset metadata and dependencies |
 | `asset_query_uuid` | Convert between asset URL and UUID |
+| `asset_copy` | Copy an asset to a new location |
+| `asset_save` | Save/overwrite content of an existing asset |
+| `asset_query_meta` | Get asset meta information (import settings, etc.) |
+| `asset_query_users` | Reverse dependency: find which assets reference this one |
+| `asset_query_dependencies` | Forward dependency: find which assets this one depends on |
+| `asset_open` | Open an asset in the editor |
+| `asset_reimport` | Re-import an asset (regenerate compiled/library files) |
 
 ### Prefab — 5 tools
 
@@ -104,7 +118,7 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `prefab_restore` | Restore a prefab instance to its original state |
 | `prefab_create_empty` | Create a new empty prefab asset directly (no scene node needed) |
 
-### Project — 4 tools
+### Project — 6 tools
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -112,6 +126,8 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `project_refresh` | Refresh the asset database |
 | `project_build` | Build project for a target platform |
 | `project_preview` | Start or stop game preview |
+| `project_query_config` | Read a project-level configuration value |
+| `project_set_config` | Set a project-level configuration value |
 
 ### Debug — 3 tools
 
@@ -136,7 +152,7 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `scene_view_icon_gizmo` | Get or set icon gizmo 3D mode and size |
 | `scene_view_status` | Get all scene view settings at once |
 
-### Editor — 5 tools *(advanced)*
+### Editor — 8 tools *(advanced)*
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -145,6 +161,9 @@ You can enable/disable tool categories in the panel's **Tool Categories** sectio
 | `editor_open_settings` | Open the preferences panel |
 | `editor_network_info` | Get server IPs and port info |
 | `editor_editor_info` | Get editor version, platform, Node.js version |
+| `editor_engine_info` | Get engine version, path, and native engine info |
+| `editor_open_url` | Open a URL or external program |
+| `editor_query_devices` | Query connected devices (for native platform debugging) |
 
 ### Reference Image — 7 tools *(advanced)*
 

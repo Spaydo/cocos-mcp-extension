@@ -87,6 +87,36 @@ export class ComponentTools implements ToolExecutor {
                 description: 'List all available component types that can be added to nodes',
                 inputSchema: { type: 'object', properties: {} },
             },
+            {
+                name: 'query_detail',
+                description: 'Query a single component by its UUID (from query-node results)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        componentUuid: { type: 'string', description: 'Component UUID' },
+                    },
+                    required: ['componentUuid'],
+                },
+            },
+            {
+                name: 'execute_method',
+                description: 'Execute a method on a component at runtime',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Node UUID' },
+                        componentType: { type: 'string', description: 'Component type, e.g. cc.Sprite' },
+                        method: { type: 'string', description: 'Method name to call' },
+                        args: { type: 'array', description: 'Arguments to pass to the method' },
+                    },
+                    required: ['uuid', 'componentType', 'method'],
+                },
+            },
+            {
+                name: 'list_all',
+                description: 'List all registered components with details (name, cid, script path, asset UUID)',
+                inputSchema: { type: 'object', properties: {} },
+            },
         ];
     }
 
@@ -98,6 +128,9 @@ export class ComponentTools implements ToolExecutor {
             case 'set_property': return this.setProperty(args);
             case 'reset': return this.resetComponent(args.nodeUuid, args.componentType);
             case 'list_types': return this.listTypes();
+            case 'query_detail': return this.queryDetail(args.componentUuid);
+            case 'execute_method': return this.executeMethod(args.uuid, args.componentType, args.method, args.args);
+            case 'list_all': return this.listAll();
             default: return { success: false, error: `Unknown component tool: ${toolName}` };
         }
     }
@@ -333,6 +366,44 @@ export class ComponentTools implements ToolExecutor {
         try {
             const classes: any = await (Editor.Message.request as any)('scene', 'query-classes');
             return { success: true, data: classes };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryDetail(componentUuid: string): Promise<ToolResponse> {
+        try {
+            const result: any = await Editor.Message.request('scene', 'query-component', componentUuid);
+            if (!result) {
+                return { success: false, error: `Component not found: ${componentUuid}` };
+            }
+            return { success: true, data: result };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async executeMethod(uuid: string, componentType: string, method: string, args?: any[]): Promise<ToolResponse> {
+        try {
+            const compIndex = await this.findComponentIndex(uuid, componentType);
+            if (typeof compIndex === 'object') return compIndex;
+
+            const result: any = await (Editor.Message.request as any)('scene', 'execute-component-method', {
+                uuid,
+                index: compIndex,
+                name: method,
+                args: args || [],
+            });
+            return { success: true, data: result, message: `Executed ${componentType}.${method}()` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async listAll(): Promise<ToolResponse> {
+        try {
+            const components: any = await (Editor.Message.request as any)('scene', 'query-components');
+            return { success: true, data: components };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

@@ -46,6 +46,27 @@ export class EditorTools implements ToolExecutor {
                 description: 'Get editor version, platform, and Node.js version',
                 inputSchema: { type: 'object', properties: {} },
             },
+            {
+                name: 'engine_info',
+                description: 'Get engine version, path, and native engine info',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'open_url',
+                description: 'Open a URL or external program',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        url: { type: 'string', description: 'URL or program path to open' },
+                    },
+                    required: ['url'],
+                },
+            },
+            {
+                name: 'query_devices',
+                description: 'Query connected devices (for native platform debugging)',
+                inputSchema: { type: 'object', properties: {} },
+            },
         ];
     }
 
@@ -56,6 +77,9 @@ export class EditorTools implements ToolExecutor {
             case 'open_settings': return this.openSettings();
             case 'network_info': return this.networkInfo();
             case 'editor_info': return this.editorInfo();
+            case 'engine_info': return this.engineInfo();
+            case 'open_url': return this.openUrl(args.url);
+            case 'query_devices': return this.queryDevices();
             default: return { success: false, error: `Unknown editor tool: ${toolName}` };
         }
     }
@@ -128,6 +152,33 @@ export class EditorTools implements ToolExecutor {
                 projectPath: Editor.Project.path,
             };
             return { success: true, data };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async engineInfo(): Promise<ToolResponse> {
+        try {
+            const info: any = await (Editor.Message.request as any)('engine', 'query-info');
+            return { success: true, data: info };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async openUrl(url: string): Promise<ToolResponse> {
+        try {
+            await (Editor.Message.request as any)('program', 'open-url', url);
+            return { success: true, message: `Opened: ${url}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryDevices(): Promise<ToolResponse> {
+        try {
+            const devices: any = await (Editor.Message.request as any)('device', 'query');
+            return { success: true, data: devices || [] };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
