@@ -329,6 +329,19 @@ export class NodeTools implements ToolExecutor {
 
             const applied: string[] = [];
 
+            // Auto-add cc.UITransform for 2D nodes
+            if (args.type === '2DNode') {
+                try {
+                    await Editor.Message.request('scene', 'create-component', {
+                        uuid: nodeUuid,
+                        component: 'cc.UITransform',
+                    });
+                    applied.push('+cc.UITransform');
+                } catch {
+                    // UITransform may already exist, ignore
+                }
+            }
+
             // Apply transform properties if provided
             if (args.position) {
                 await this.setProperty(nodeUuid, 'position', args.position);
