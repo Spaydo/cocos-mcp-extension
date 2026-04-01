@@ -167,5 +167,58 @@ module.exports = {
         'validation_take_snapshot': 'Capture current scene state as a named snapshot for comparison',
         'validation_compare_snapshots': 'Compare two snapshots to see what changed',
         'validation_get_scene_stats': 'Get scene statistics: node count, component count, depth',
+
+        // asset (new)
+        'asset_save_meta': 'Save asset meta/import settings',
+        'asset_generate_url': 'Generate a non-conflicting asset URL',
+        'asset_query_db_ready': 'Check if the asset database is initialized and ready',
+        'asset_batch_import': 'Import multiple external files as assets at once',
+        'asset_batch_delete': 'Delete multiple assets at once',
+        'asset_get_tree': 'Get asset hierarchy as a tree structure',
+        'asset_export_manifest': 'Export complete asset inventory as JSON',
+        'asset_get_unused': 'Find unused assets (not yet available)',
+        'asset_compress_textures': 'Batch compress texture assets (not yet available)',
+
+        // node (new)
+        'node_copy': 'Copy node(s) to editor clipboard',
+        'node_paste': 'Paste node(s) from clipboard to a target parent',
+        'node_cut': 'Cut node(s) (copy to clipboard and mark for deletion)',
+        'node_create_primitive': 'Create a 3D primitive shape node (Cube, Sphere, etc.)',
+
+        // scene (new)
+        'scene_begin_recording': 'Begin undo recording for a node (returns undoId)',
+        'scene_end_recording': 'End undo recording and commit changes',
+        'scene_cancel_recording': 'Cancel undo recording and discard changes',
+        'scene_move_array_element': 'Move an element within a serialized array property',
+        'scene_remove_array_element': 'Remove an element from a serialized array property',
+        'scene_query_components': 'List all component instances in the current scene',
+
+        // component (new)
+        'component_query_has_script': 'Check if a component class has an associated user script',
+
+        // editor (new)
+        'editor_get_all_preferences': 'Get all editor preferences across known categories',
+        'editor_reset_preferences': 'Reset a preference category to default values',
+        'editor_export_preferences': 'Export all preferences as a JSON snapshot',
+        'editor_import_preferences': 'Import preferences from JSON (not yet available)',
+        'editor_query_server_ip_list': 'Get the list of server IP addresses',
+        'editor_check_connectivity': 'Check editor server connectivity and measure latency',
+        'editor_get_network_interfaces': 'List all local network interfaces and addresses',
+
+        // validation (new)
+        'validation_validate_references': 'Verify all asset references exist (check for broken references)',
+
+        // broadcast
+        'broadcast_listen': 'Register a broadcast listener on a channel',
+        'broadcast_stop_listening': 'Remove a broadcast listener from a channel',
+        'broadcast_get_log': 'Get filtered broadcast message log',
+        'broadcast_clear_log': 'Clear the broadcast message log',
+        'broadcast_get_active_listeners': 'List all active broadcast listeners',
+
+        // file_editor
+        'file_editor_insert_text': 'Insert text at a specific line in a file',
+        'file_editor_delete_lines': 'Delete a range of lines from a file',
+        'file_editor_replace_text': 'Find and replace text in a file',
+        'file_editor_query_text': 'Read a range of lines from a file',
     },
 };

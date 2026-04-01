@@ -25,6 +25,8 @@ export const DEFAULT_ENABLED_CATEGORIES: Record<string, boolean> = {
     editor: false,
     reference_image: false,
     animation: false,
+    broadcast: false,
+    file_editor: false,
 };
 
 export interface ServerStatus {

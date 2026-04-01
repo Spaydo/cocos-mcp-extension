@@ -100,6 +100,71 @@ export class SceneTools implements ToolExecutor {
                 description: 'Get the bounding box of the current scene view',
                 inputSchema: { type: 'object', properties: {} },
             },
+            {
+                name: 'begin_recording',
+                description: 'Begin undo recording for a node (returns undoId)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeUuid: { type: 'string', description: 'Node UUID to record changes for' },
+                    },
+                    required: ['nodeUuid'],
+                },
+            },
+            {
+                name: 'end_recording',
+                description: 'End undo recording and commit changes',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        undoId: { type: 'string', description: 'Undo recording ID from begin_recording' },
+                    },
+                    required: ['undoId'],
+                },
+            },
+            {
+                name: 'cancel_recording',
+                description: 'Cancel undo recording and discard changes',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        undoId: { type: 'string', description: 'Undo recording ID from begin_recording' },
+                    },
+                    required: ['undoId'],
+                },
+            },
+            {
+                name: 'move_array_element',
+                description: 'Move an element within a serialized array property',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Node UUID' },
+                        path: { type: 'string', description: 'Array property path (e.g. __comps__)' },
+                        target: { type: 'number', description: 'Current index of element' },
+                        offset: { type: 'number', description: 'Move offset (positive=down, negative=up)' },
+                    },
+                    required: ['uuid', 'path', 'target'],
+                },
+            },
+            {
+                name: 'remove_array_element',
+                description: 'Remove an element from a serialized array property',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Node UUID' },
+                        path: { type: 'string', description: 'Array property path' },
+                        index: { type: 'number', description: 'Index of element to remove' },
+                    },
+                    required: ['uuid', 'path', 'index'],
+                },
+            },
+            {
+                name: 'query_components',
+                description: 'List all component instances in the current scene',
+                inputSchema: { type: 'object', properties: {} },
+            },
         ];
     }
 
@@ -118,6 +183,12 @@ export class SceneTools implements ToolExecutor {
             case 'save_as': return this.saveAs();
             case 'ready': return this.isReady();
             case 'bounds': return this.queryBounds();
+            case 'begin_recording': return this.beginRecording(args.nodeUuid);
+            case 'end_recording': return this.endRecording(args.undoId);
+            case 'cancel_recording': return this.cancelRecording(args.undoId);
+            case 'move_array_element': return this.moveArrayElement(args);
+            case 'remove_array_element': return this.removeArrayElement(args);
+            case 'query_components': return this.queryComponents();
             default: return { success: false, error: `Unknown scene tool: ${toolName}` };
         }
     }
@@ -288,6 +359,60 @@ export class SceneTools implements ToolExecutor {
         try {
             const bounds: any = await (Editor.Message.request as any)('scene', 'query-scene-bounds');
             return { success: true, data: bounds };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async beginRecording(nodeUuid: string): Promise<ToolResponse> {
+        try {
+            const undoId = await (Editor.Message.request as any)('scene', 'begin-recording', nodeUuid);
+            return { success: true, data: { undoId }, message: 'Undo recording started' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async endRecording(undoId: string): Promise<ToolResponse> {
+        try {
+            await (Editor.Message.request as any)('scene', 'end-recording', undoId);
+            return { success: true, message: 'Undo recording committed' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async cancelRecording(undoId: string): Promise<ToolResponse> {
+        try {
+            await (Editor.Message.request as any)('scene', 'cancel-recording', undoId);
+            return { success: true, message: 'Undo recording cancelled' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async moveArrayElement(args: any): Promise<ToolResponse> {
+        try {
+            await (Editor.Message.request as any)('scene', 'move-array-element', { uuid: args.uuid, path: args.path, target: args.target, offset: args.offset ?? 1 });
+            return { success: true, message: 'Array element moved' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async removeArrayElement(args: any): Promise<ToolResponse> {
+        try {
+            await (Editor.Message.request as any)('scene', 'remove-array-element', { uuid: args.uuid, path: args.path, index: args.index });
+            return { success: true, message: 'Array element removed' };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryComponents(): Promise<ToolResponse> {
+        try {
+            const result = await (Editor.Message.request as any)('scene', 'query-components');
+            return { success: true, data: result };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

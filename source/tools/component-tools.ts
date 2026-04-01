@@ -128,6 +128,17 @@ export class ComponentTools implements ToolExecutor {
                     },
                 },
             },
+            {
+                name: 'query_has_script',
+                description: 'Check if a component class has an associated user script',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        className: { type: 'string', description: 'Component class name (e.g. cc.Sprite, MyComponent)' },
+                    },
+                    required: ['className'],
+                },
+            },
         ];
     }
 
@@ -142,6 +153,7 @@ export class ComponentTools implements ToolExecutor {
             case 'query_detail': return this.queryDetail(args.componentUuid);
             case 'execute_method': return this.executeMethod(args.uuid, args.componentType, args.method, args.args);
             case 'list_all': return this.listAll(args.filter);
+            case 'query_has_script': return this.queryHasScript(args?.className);
             default: return { success: false, error: `Unknown component tool: ${toolName}` };
         }
     }
@@ -479,6 +491,15 @@ export class ComponentTools implements ToolExecutor {
                 args: args || [],
             });
             return { success: true, data: result, message: `Executed ${componentType}.${method}()` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryHasScript(className: string): Promise<ToolResponse> {
+        try {
+            const result: any = await (Editor.Message.request as any)('scene', 'query-component-has-script', className);
+            return { success: true, data: { className, hasScript: !!result } };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

@@ -78,6 +78,16 @@ export class ValidationTools implements ToolExecutor {
                     properties: {},
                 },
             },
+            {
+                name: 'validate_references',
+                description: 'Verify all asset references in the project exist (check for broken references)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        pattern: { type: 'string', description: 'Asset pattern to check (default: db://assets/**/*.*)' },
+                    },
+                },
+            },
         ];
     }
 
@@ -89,6 +99,7 @@ export class ValidationTools implements ToolExecutor {
             case 'take_snapshot':      return this.takeSnapshot(args?.label);
             case 'compare_snapshots':  return this.compareSnapshots(args?.snapshotId1, args?.snapshotId2);
             case 'get_scene_stats':    return this.getSceneStats();
+            case 'validate_references': return this.validateReferences(args?.pattern);
             default:
                 return { success: false, error: `Unknown validation action: ${actionName}` };
         }
@@ -235,6 +246,62 @@ export class ValidationTools implements ToolExecutor {
                 args: [],
             });
             return result as ToolResponse;
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    private async validateReferences(pattern?: string): Promise<ToolResponse> {
+        try {
+            const searchPattern = pattern || 'db://assets/**/*.*';
+            const assets: any = await Editor.Message.request('asset-db', 'query-assets', { pattern: searchPattern });
+
+            if (!assets || !Array.isArray(assets)) {
+                return { success: true, data: { totalAssets: 0, totalReferences: 0, brokenReferences: [], valid: true } };
+            }
+
+            const brokenReferences: any[] = [];
+            let totalReferences = 0;
+
+            for (const asset of assets) {
+                try {
+                    const deps: any = await (Editor.Message.request as any)('asset-db', 'query-asset-dependencies', asset.uuid);
+                    if (deps && Array.isArray(deps)) {
+                        for (const depUuid of deps) {
+                            totalReferences++;
+                            try {
+                                const info = await Editor.Message.request('asset-db', 'query-asset-info', depUuid);
+                                if (!info) {
+                                    brokenReferences.push({
+                                        assetName: asset.name,
+                                        assetUuid: asset.uuid,
+                                        missingDependency: depUuid,
+                                    });
+                                }
+                            } catch {
+                                brokenReferences.push({
+                                    assetName: asset.name,
+                                    assetUuid: asset.uuid,
+                                    missingDependency: depUuid,
+                                });
+                            }
+                        }
+                    }
+                } catch {
+                    // Skip assets that don't support dependency queries
+                }
+            }
+
+            return {
+                success: true,
+                data: {
+                    totalAssets: assets.length,
+                    totalReferences,
+                    brokenCount: brokenReferences.length,
+                    brokenReferences,
+                    valid: brokenReferences.length === 0,
+                },
+            };
         } catch (error: any) {
             return { success: false, error: error.message };
         }

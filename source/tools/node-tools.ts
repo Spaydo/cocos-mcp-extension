@@ -116,6 +116,56 @@ export class NodeTools implements ToolExecutor {
                     required: ['uuid', 'parentUuid'],
                 },
             },
+            {
+                name: 'copy',
+                description: 'Copy node(s) to editor clipboard',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuids: { type: 'array', description: 'Node UUIDs to copy' },
+                    },
+                    required: ['uuids'],
+                },
+            },
+            {
+                name: 'paste',
+                description: 'Paste node(s) from clipboard to a target parent',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        target: { type: 'string', description: 'Parent node UUID (default: scene root)' },
+                        keepWorldTransform: { type: 'boolean', description: 'Preserve world coordinates (default: false)' },
+                    },
+                },
+            },
+            {
+                name: 'cut',
+                description: 'Cut node(s) (copy to clipboard and mark for deletion)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuids: { type: 'array', description: 'Node UUIDs to cut' },
+                    },
+                    required: ['uuids'],
+                },
+            },
+            {
+                name: 'create_primitive',
+                description: 'Create a 3D primitive shape node (Cube, Sphere, etc.)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        type: {
+                            type: 'string',
+                            enum: ['Capsule', 'Cone', 'Cube', 'Cylinder', 'Plane', 'Quad', 'Sphere', 'Torus'],
+                            description: 'Primitive type',
+                        },
+                        parentUuid: { type: 'string', description: 'Parent node UUID' },
+                        name: { type: 'string', description: 'Override node name' },
+                    },
+                    required: ['type'],
+                },
+            },
         ];
     }
 
@@ -129,6 +179,10 @@ export class NodeTools implements ToolExecutor {
             case 'reset_transform': return this.resetTransform(args.uuid);
             case 'find_by_asset': return this.findByAsset(args.assetUuid);
             case 'move': return this.moveNode(args.uuid, args.parentUuid, args.siblingIndex);
+            case 'copy': return this.copyNodes(args.uuids);
+            case 'paste': return this.pasteNodes(args);
+            case 'cut': return this.cutNodes(args.uuids);
+            case 'create_primitive': return this.createPrimitive(args);
             default: return { success: false, error: `Unknown node tool: ${toolName}` };
         }
     }
@@ -557,6 +611,80 @@ export class NodeTools implements ToolExecutor {
         try {
             const result: any = await Editor.Message.request('scene', 'query-nodes-by-asset-uuid', assetUuid);
             return { success: true, data: result || [] };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async copyNodes(uuids: string[]): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('scene', 'copy-node', uuids);
+            return { success: true, message: `Copied ${uuids.length} node(s) to clipboard` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async pasteNodes(args: any): Promise<ToolResponse> {
+        try {
+            const result: any = await (Editor.Message.request as any)('scene', 'paste-node', {
+                target: args.target,
+                keepWorldTransform: args.keepWorldTransform || false,
+            });
+            return {
+                success: true,
+                data: { pastedUuids: result },
+                message: 'Node(s) pasted from clipboard',
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async cutNodes(uuids: string[]): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('scene', 'cut-node', uuids);
+            return { success: true, message: `Cut ${uuids.length} node(s) to clipboard` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async createPrimitive(args: any): Promise<ToolResponse> {
+        try {
+            const prefabUrl = `db://internal/default_prefab/3d/${args.type}.prefab`;
+            const uuidResult: any = await Editor.Message.request('asset-db', 'query-uuid', prefabUrl);
+            const uuid = typeof uuidResult === 'string' ? uuidResult : uuidResult?.uuid;
+            if (!uuid) {
+                return { success: false, error: `Primitive type '${args.type}' not found` };
+            }
+
+            let parentUuid = args.parentUuid;
+            if (!parentUuid) {
+                try {
+                    const tree: any = await Editor.Message.request('scene', 'query-node-tree');
+                    parentUuid = tree?.uuid;
+                } catch {
+                    const sceneInfo: any = await Editor.Message.request('scene', 'query-current-scene');
+                    parentUuid = sceneInfo?.uuid;
+                }
+            }
+
+            if (!parentUuid) {
+                return { success: false, error: 'Cannot determine scene root' };
+            }
+
+            const nodeUuid: any = await Editor.Message.request('scene', 'create-node', {
+                parent: parentUuid,
+                assetUuid: uuid,
+                name: args.name || args.type,
+            } as any);
+
+            return {
+                success: true,
+                data: { uuid: nodeUuid, name: args.name || args.type },
+                message: `Primitive '${args.name || args.type}' created`,
+            };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

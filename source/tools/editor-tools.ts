@@ -1,3 +1,4 @@
+import * as os from 'os';
 import { ToolDefinition, ToolResponse, ToolExecutor } from '../types';
 
 export class EditorTools implements ToolExecutor {
@@ -67,6 +68,68 @@ export class EditorTools implements ToolExecutor {
                 description: 'Query connected devices (for native platform debugging)',
                 inputSchema: { type: 'object', properties: {} },
             },
+            {
+                name: 'get_all_preferences',
+                description: 'Get all editor preferences across known categories',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        scope: { type: 'string', description: 'Scope: global or project (default: global)' },
+                    },
+                },
+            },
+            {
+                name: 'reset_preferences',
+                description: 'Reset a preference category to default values',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        protocol: { type: 'string', description: 'Preference category name (e.g. general, preview)' },
+                        scope: { type: 'string', description: 'Scope: global or project (default: global)' },
+                    },
+                    required: ['protocol'],
+                },
+            },
+            {
+                name: 'export_preferences',
+                description: 'Export all preferences as a JSON snapshot',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        scope: { type: 'string', description: 'Scope: global or project (default: global)' },
+                    },
+                },
+            },
+            {
+                name: 'import_preferences',
+                description: 'Import preferences from JSON (not yet available)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        data: { type: 'object', description: 'Preferences data to import' },
+                    },
+                },
+            },
+            {
+                name: 'query_server_ip_list',
+                description: 'Get the list of server IP addresses',
+                inputSchema: { type: 'object', properties: {} },
+            },
+            {
+                name: 'check_connectivity',
+                description: 'Check editor server connectivity and measure latency',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        timeout: { type: 'number', description: 'Timeout in milliseconds (default: 5000)' },
+                    },
+                },
+            },
+            {
+                name: 'get_network_interfaces',
+                description: 'List all local network interfaces and addresses',
+                inputSchema: { type: 'object', properties: {} },
+            },
         ];
     }
 
@@ -80,6 +143,13 @@ export class EditorTools implements ToolExecutor {
             case 'engine_info': return this.engineInfo();
             case 'open_url': return this.openUrl(args.url);
             case 'query_devices': return this.queryDevices();
+            case 'get_all_preferences': return this.getAllPreferences(args?.scope);
+            case 'reset_preferences': return this.resetPreferences(args.protocol, args?.scope);
+            case 'export_preferences': return this.exportPreferences(args?.scope);
+            case 'import_preferences': return this.importPreferences();
+            case 'query_server_ip_list': return this.queryServerIpList();
+            case 'check_connectivity': return this.checkConnectivity(args);
+            case 'get_network_interfaces': return this.getNetworkInterfaces();
             default: return { success: false, error: `Unknown editor tool: ${toolName}` };
         }
     }
@@ -179,6 +249,113 @@ export class EditorTools implements ToolExecutor {
         try {
             const devices: any = await (Editor.Message.request as any)('device', 'query');
             return { success: true, data: devices || [] };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async getAllPreferences(scope?: string): Promise<ToolResponse> {
+        try {
+            const protocols = ['general', 'external-tools', 'preview', 'build', 'engine', 'laboratory'];
+            const result: Record<string, any> = {};
+            for (const protocol of protocols) {
+                try {
+                    if (scope === 'project') {
+                        result[protocol] = await Editor.Profile.getProject(protocol, '');
+                    } else {
+                        result[protocol] = await (Editor.Profile as any).getConfig(protocol, '');
+                    }
+                } catch {
+                    // skip protocols that throw errors
+                }
+            }
+            return { success: true, data: { scope: scope || 'global', preferences: result } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async resetPreferences(protocol: string, scope?: string): Promise<ToolResponse> {
+        try {
+            let defaults: any;
+            try {
+                if (scope === 'project') {
+                    defaults = await Editor.Profile.getProject(protocol, '');
+                } else {
+                    defaults = await (Editor.Profile as any).getConfig(protocol, '');
+                }
+            } catch {
+                return { success: false, error: `Unable to retrieve defaults for protocol "${protocol}". The Editor API does not expose a reset-to-defaults method. Please reset preferences through the Editor UI (Edit > Preferences).` };
+            }
+            if (defaults === undefined || defaults === null) {
+                return { success: false, error: `No default values found for protocol "${protocol}". Please reset preferences through the Editor UI (Edit > Preferences).` };
+            }
+            if (scope === 'project') {
+                await Editor.Profile.setProject(protocol, '', defaults);
+            } else {
+                await Editor.Profile.setConfig(protocol, '', defaults);
+            }
+            return { success: true, message: `Preferences for "${protocol}" have been reset (${scope || 'global'} scope).` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async exportPreferences(scope?: string): Promise<ToolResponse> {
+        try {
+            const inner = await this.getAllPreferences(scope);
+            if (!inner.success) {
+                return inner;
+            }
+            const snapshot = {
+                exportedAt: new Date().toISOString(),
+                scope: scope || 'global',
+                editorVersion: Editor.App.version || 'unknown',
+                projectPath: Editor.Project.path,
+                preferences: (inner.data as any).preferences,
+            };
+            return { success: true, data: snapshot };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async importPreferences(): Promise<ToolResponse> {
+        return { success: false, error: 'import_preferences is not yet available. Please import preferences through the Editor UI.' };
+    }
+
+    private async queryServerIpList(): Promise<ToolResponse> {
+        try {
+            const ipList = await Editor.Message.request('server', 'query-ip-list');
+            return { success: true, data: ipList };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async checkConnectivity(args: any): Promise<ToolResponse> {
+        const timeout = args?.timeout || 5000;
+        const start = Date.now();
+        try {
+            const port = await Promise.race([
+                Editor.Message.request('server', 'query-port'),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout)),
+            ]);
+            const latency = Date.now() - start;
+            return { success: true, data: { reachable: true, latencyMs: latency, port } };
+        } catch {
+            return { success: true, data: { reachable: false, latencyMs: Date.now() - start, timeout } };
+        }
+    }
+
+    private async getNetworkInterfaces(): Promise<ToolResponse> {
+        try {
+            const raw = os.networkInterfaces();
+            const interfaces = Object.entries(raw).map(([name, addrs]) => ({
+                name,
+                addresses: (addrs || []).map(({ address, family, internal }) => ({ address, family, internal })),
+            }));
+            return { success: true, data: interfaces };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

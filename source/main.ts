@@ -15,8 +15,11 @@ import { EditorTools } from './tools/editor-tools';
 import { ReferenceImageTools } from './tools/reference-image-tools';
 import { AnimationTools } from './tools/animation-tools';
 import { ValidationTools } from './tools/validation-tools';
+import { BroadcastTools } from './tools/broadcast-tools';
+import { FileEditorTools } from './tools/file-editor-tools';
 
 let mcpServer: MCPServer | null = null;
+let broadcastTools: any = null;
 let editorVersion: string = '';
 
 // === Console capture ===
@@ -153,6 +156,9 @@ export function load() {
     mcpServer.registerToolCategory('reference_image', new ReferenceImageTools());
     mcpServer.registerToolCategory('animation', new AnimationTools());
     mcpServer.registerToolCategory('validation', new ValidationTools());
+    broadcastTools = new BroadcastTools();
+    mcpServer.registerToolCategory('broadcast', broadcastTools);
+    mcpServer.registerToolCategory('file_editor', new FileEditorTools());
 
     // 6. Auto-start if configured
     if (settings.autoStart) {
@@ -180,6 +186,11 @@ export function unload() {
         msg.removeBroadcastListener('console:log', editorLogHandler);
         msg.removeBroadcastListener('console:warn', editorWarnHandler);
         msg.removeBroadcastListener('console:error', editorErrorHandler);
+    }
+
+    if (broadcastTools?.dispose) {
+        broadcastTools.dispose();
+        broadcastTools = null;
     }
 
     if (mcpServer) {

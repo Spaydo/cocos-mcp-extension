@@ -82,6 +82,8 @@ export class MCPServer {
         reference_image: 'Reference image overlay management',
         animation: 'Animation playback control',
         validation: 'Scene validation and health checking',
+        broadcast: 'Broadcast message monitoring (listen, log, filter)',
+        file_editor: 'Project file editing (insert, delete, replace, query text)',
     };
 
     private static REFRESH_MAP: Record<string, 'scene' | 'asset'> = {
@@ -127,6 +129,21 @@ export class MCPServer {
 
         // Scene operations
         'scene.create': 'asset',
+
+        // Asset advanced operations
+        'asset.save_meta': 'asset',
+        'asset.batch_import': 'asset',
+        'asset.batch_delete': 'asset',
+
+        // Node clipboard operations
+        'node.paste': 'scene',
+        'node.cut': 'scene',
+        'node.create_primitive': 'scene',
+
+        // Scene undo operations
+        'scene.end_recording': 'scene',
+        'scene.move_array_element': 'scene',
+        'scene.remove_array_element': 'scene',
     };
 
     private buildDescription(category: string, tools: ToolDefinition[]): string {

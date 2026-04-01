@@ -167,5 +167,58 @@ module.exports = {
         'validation_take_snapshot': '擷取當前場景狀態作為命名快照以供比較',
         'validation_compare_snapshots': '比較兩個快照以查看變更內容',
         'validation_get_scene_stats': '取得場景統計：節點數、組件數、層級深度',
+
+        // asset (new)
+        'asset_save_meta': '儲存資源中繼資料/匯入設定',
+        'asset_generate_url': '產生不重複的資源 URL',
+        'asset_query_db_ready': '檢查資源資料庫是否已初始化就緒',
+        'asset_batch_import': '批次匯入多個外部檔案為資源',
+        'asset_batch_delete': '批次刪除多個資源',
+        'asset_get_tree': '取得資源階層樹狀結構',
+        'asset_export_manifest': '匯出完整資源清單為 JSON',
+        'asset_get_unused': '查找未使用的資源（尚未實作）',
+        'asset_compress_textures': '批次壓縮紋理資源（尚未實作）',
+
+        // node (new)
+        'node_copy': '複製節點到編輯器剪貼簿',
+        'node_paste': '從剪貼簿貼上節點到指定父節點',
+        'node_cut': '剪下節點（複製到剪貼簿並標記刪除）',
+        'node_create_primitive': '建立 3D 基本形狀節點（立方體、球體等）',
+
+        // scene (new)
+        'scene_begin_recording': '開始撤銷錄製（回傳 undoId）',
+        'scene_end_recording': '結束撤銷錄製並提交變更',
+        'scene_cancel_recording': '取消撤銷錄製並丟棄變更',
+        'scene_move_array_element': '移動序列化陣列屬性中的元素',
+        'scene_remove_array_element': '移除序列化陣列屬性中的元素',
+        'scene_query_components': '列出當前場景中所有組件實例',
+
+        // component (new)
+        'component_query_has_script': '檢查組件類別是否關聯使用者腳本',
+
+        // editor (new)
+        'editor_get_all_preferences': '取得所有編輯器偏好設定',
+        'editor_reset_preferences': '將偏好設定類別重置為預設值',
+        'editor_export_preferences': '匯出所有偏好設定為 JSON 快照',
+        'editor_import_preferences': '從 JSON 匯入偏好設定（尚未實作）',
+        'editor_query_server_ip_list': '取得伺服器 IP 位址列表',
+        'editor_check_connectivity': '檢查編輯器伺服器連線狀態並測量延遲',
+        'editor_get_network_interfaces': '列出所有本機網路介面和位址',
+
+        // validation (new)
+        'validation_validate_references': '驗證所有資源引用是否存在（檢查損壞的引用）',
+
+        // broadcast
+        'broadcast_listen': '在指定頻道註冊廣播監聽器',
+        'broadcast_stop_listening': '移除指定頻道的廣播監聽器',
+        'broadcast_get_log': '取得已過濾的廣播訊息日誌',
+        'broadcast_clear_log': '清除廣播訊息日誌',
+        'broadcast_get_active_listeners': '列出所有已啟用的廣播監聽器',
+
+        // file_editor
+        'file_editor_insert_text': '在檔案的指定行插入文字',
+        'file_editor_delete_lines': '刪除檔案中的指定行範圍',
+        'file_editor_replace_text': '在檔案中尋找並取代文字',
+        'file_editor_query_text': '讀取檔案中的指定行範圍',
     },
 };

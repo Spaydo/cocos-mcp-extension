@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { ToolDefinition, ToolResponse, ToolExecutor } from '../types';
 
 export class AssetTools implements ToolExecutor {
@@ -167,6 +169,97 @@ export class AssetTools implements ToolExecutor {
                     required: ['uuid'],
                 },
             },
+            {
+                name: 'save_meta',
+                description: 'Save asset meta/import settings',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        uuid: { type: 'string', description: 'Asset UUID' },
+                        content: { type: 'string', description: 'Meta content as JSON string' },
+                    },
+                    required: ['uuid', 'content'],
+                },
+            },
+            {
+                name: 'generate_url',
+                description: 'Generate a non-conflicting asset URL',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        url: { type: 'string', description: 'Desired db:// URL' },
+                    },
+                    required: ['url'],
+                },
+            },
+            {
+                name: 'query_db_ready',
+                description: 'Check if the asset database is initialized and ready',
+                inputSchema: {
+                    type: 'object',
+                    properties: {},
+                },
+            },
+            {
+                name: 'batch_import',
+                description: 'Import multiple external files as assets (max 100)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        files: { type: 'array', description: 'Array of {source, target} objects. source=external path, target=db:// path' },
+                    },
+                    required: ['files'],
+                },
+            },
+            {
+                name: 'batch_delete',
+                description: 'Delete multiple assets at once (max 100)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        urls: { type: 'array', description: 'Array of db:// URLs to delete' },
+                    },
+                    required: ['urls'],
+                },
+            },
+            {
+                name: 'get_tree',
+                description: 'Get asset hierarchy as a tree structure',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        root: { type: 'string', description: 'Root path (default: db://assets)' },
+                        maxDepth: { type: 'number', description: 'Max tree depth (default: 5)' },
+                    },
+                },
+            },
+            {
+                name: 'export_manifest',
+                description: 'Export complete asset inventory as JSON',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        pattern: { type: 'string', description: 'Glob pattern (default: db://assets/**/*.*)' },
+                        includeMetadata: { type: 'boolean', description: 'Include detailed metadata per asset' },
+                    },
+                },
+            },
+            {
+                name: 'get_unused',
+                description: 'Find unused assets (not yet available)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {},
+                },
+            },
+            {
+                name: 'compress_textures',
+                description: 'Batch compress texture assets (not yet available)',
+                inputSchema: {
+                    type: 'object',
+                    properties: {},
+                },
+            },
         ];
     }
 
@@ -186,6 +279,15 @@ export class AssetTools implements ToolExecutor {
             case 'query_dependencies': return this.queryDependencies(args.uuid, args.type);
             case 'open': return this.openAsset(args.uuid);
             case 'reimport': return this.reimportAsset(args.uuid);
+            case 'save_meta': return this.saveMeta(args.uuid, args.content);
+            case 'generate_url': return this.generateUrl(args.url);
+            case 'query_db_ready': return this.queryDbReady();
+            case 'batch_import': return this.batchImport(args.files);
+            case 'batch_delete': return this.batchDelete(args.urls);
+            case 'get_tree': return this.getTree(args.root, args.maxDepth);
+            case 'export_manifest': return this.exportManifest(args.pattern, args.includeMetadata);
+            case 'get_unused': return this.getUnused();
+            case 'compress_textures': return this.compressTextures();
             default: return { success: false, error: `Unknown asset tool: ${toolName}` };
         }
     }
@@ -429,5 +531,207 @@ export class AssetTools implements ToolExecutor {
         } catch (err: any) {
             return { success: false, error: err.message };
         }
+    }
+
+    private async saveMeta(uuid: string, content: string): Promise<ToolResponse> {
+        try {
+            await Editor.Message.request('asset-db', 'save-asset-meta', uuid, content);
+            return { success: true, message: `Meta saved for asset: ${uuid}` };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async generateUrl(url: string): Promise<ToolResponse> {
+        try {
+            const result: any = await Editor.Message.request('asset-db', 'generate-available-url', url);
+            return { success: true, data: { requestedUrl: url, availableUrl: result } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async queryDbReady(): Promise<ToolResponse> {
+        try {
+            const ready: any = await Editor.Message.request('asset-db', 'query-ready');
+            return { success: true, data: { ready: !!ready } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async batchImport(files: Array<{ source: string; target: string }>): Promise<ToolResponse> {
+        try {
+            if (!Array.isArray(files) || files.length === 0) {
+                return { success: false, error: 'files must be a non-empty array' };
+            }
+            const capped = files.slice(0, 100);
+            let successCount = 0;
+            let errorCount = 0;
+            const results: Array<{ source: string; target: string; success: boolean; error?: string }> = [];
+            for (const file of capped) {
+                if (!fs.existsSync(file.source)) {
+                    errorCount++;
+                    results.push({ source: file.source, target: file.target, success: false, error: `Source file not found: ${file.source}` });
+                    continue;
+                }
+                try {
+                    await (Editor.Message.request as any)('asset-db', 'import-asset', file.source, file.target);
+                    successCount++;
+                    results.push({ source: file.source, target: file.target, success: true });
+                } catch (err: any) {
+                    errorCount++;
+                    results.push({ source: file.source, target: file.target, success: false, error: err.message });
+                }
+            }
+            return {
+                success: true,
+                data: { totalFiles: capped.length, successCount, errorCount, results },
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async batchDelete(urls: string[]): Promise<ToolResponse> {
+        try {
+            if (!Array.isArray(urls) || urls.length === 0) {
+                return { success: false, error: 'urls must be a non-empty array' };
+            }
+            const capped = urls.slice(0, 100);
+            let successCount = 0;
+            let errorCount = 0;
+            const results: Array<{ url: string; success: boolean; error?: string }> = [];
+            for (const url of capped) {
+                try {
+                    await Editor.Message.request('asset-db', 'delete-asset', url);
+                    successCount++;
+                    results.push({ url, success: true });
+                } catch (err: any) {
+                    errorCount++;
+                    results.push({ url, success: false, error: err.message });
+                }
+            }
+            return {
+                success: true,
+                data: { totalFiles: capped.length, successCount, errorCount, results },
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async getTree(root?: string, maxDepth?: number): Promise<ToolResponse> {
+        try {
+            const rootPath = root || 'db://assets';
+            const depth = maxDepth != null ? maxDepth : 5;
+            const assets: any = await Editor.Message.request('asset-db', 'query-assets', { pattern: rootPath + '/**/*' });
+            if (!assets || !Array.isArray(assets)) {
+                return { success: true, data: { name: path.basename(rootPath), url: rootPath, children: [] } };
+            }
+
+            // Build tree from flat list of assets
+            interface TreeNode {
+                name: string;
+                url: string;
+                uuid?: string;
+                type?: string;
+                children: TreeNode[];
+            }
+
+            const rootNode: TreeNode = { name: path.basename(rootPath), url: rootPath, children: [] };
+            const nodeMap: Record<string, TreeNode> = { [rootPath]: rootNode };
+
+            for (const asset of assets) {
+                const assetUrl: string = asset.url || asset.path || '';
+                if (!assetUrl.startsWith(rootPath)) continue;
+
+                // Compute relative segments from root
+                const relative = assetUrl.slice(rootPath.length).replace(/^\//, '');
+                const segments = relative.split('/').filter(Boolean);
+                if (segments.length === 0 || segments.length > depth) continue;
+
+                let currentUrl = rootPath;
+                let currentNode = rootNode;
+
+                for (let i = 0; i < segments.length; i++) {
+                    const seg = segments[i];
+                    const childUrl = currentUrl + '/' + seg;
+                    if (!nodeMap[childUrl]) {
+                        const isLeaf = i === segments.length - 1;
+                        const childNode: TreeNode = {
+                            name: seg,
+                            url: childUrl,
+                            children: [],
+                        };
+                        if (isLeaf) {
+                            if (asset.uuid) childNode.uuid = asset.uuid;
+                            if (asset.type) childNode.type = asset.type;
+                        }
+                        nodeMap[childUrl] = childNode;
+                        currentNode.children.push(childNode);
+                    }
+                    currentUrl = childUrl;
+                    currentNode = nodeMap[childUrl];
+                }
+            }
+
+            return { success: true, data: rootNode };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async exportManifest(pattern?: string, includeMetadata?: boolean): Promise<ToolResponse> {
+        try {
+            const queryPattern = pattern || 'db://assets/**/*.*';
+            const assets: any = await Editor.Message.request('asset-db', 'query-assets', { pattern: queryPattern });
+            if (!assets || !Array.isArray(assets)) {
+                return { success: true, data: { total: 0, assets: [] } };
+            }
+
+            const manifest: any[] = [];
+            for (const asset of assets) {
+                const entry: any = {
+                    name: asset.name,
+                    uuid: asset.uuid,
+                    url: asset.url || asset.path,
+                    type: asset.type,
+                };
+                if (includeMetadata) {
+                    try {
+                        const info: any = await Editor.Message.request('asset-db', 'query-asset-info', asset.uuid);
+                        if (info) {
+                            if (info.file) entry.file = info.file;
+                            if (info.library) entry.library = info.library;
+                            if (info.subAssets) entry.subAssets = info.subAssets;
+                            if (info.depends) entry.depends = info.depends;
+                            entry.isDirectory = info.isDirectory || false;
+                        }
+                    } catch (_) {
+                        // skip metadata errors for individual assets
+                    }
+                }
+                manifest.push(entry);
+            }
+
+            return { success: true, data: { total: manifest.length, assets: manifest } };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    private async getUnused(): Promise<ToolResponse> {
+        return {
+            success: false,
+            error: 'get_unused is not yet available. This feature requires cross-referencing all scenes and scripts.',
+        };
+    }
+
+    private async compressTextures(): Promise<ToolResponse> {
+        return {
+            success: false,
+            error: 'compress_textures is not yet available. Texture compression requires build pipeline integration.',
+        };
     }
 }
