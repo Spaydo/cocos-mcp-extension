@@ -187,7 +187,7 @@ export class MCPServer {
 
     // === Tool Info for Panel UI (per-action granularity) ===
 
-    private static CORE_CATEGORIES = ['scene', 'node', 'component', 'asset', 'prefab', 'project', 'debug'];
+    private static CORE_CATEGORIES = ['scene', 'node', 'component', 'asset', 'prefab', 'project', 'debug', 'validation'];
 
     getAllToolsInfo(): { category: string; isCore: boolean; tools: { name: string; description: string; enabled: boolean }[] }[] {
         const enabledCats = this.settings.enabledCategories || {};
@@ -449,7 +449,14 @@ export class MCPServer {
     private validateArgs(category: string, action: string, args: any): void {
         const executor = this.tools[category];
         const allTools = executor.getTools();
-        const toolNames = allTools.map(t => t.name);
+        const enabledTools = this.settings.enabledTools || {};
+
+        // Filter by per-tool enable/disable settings (same logic as setupTools)
+        const activeTools = allTools.filter(tool => {
+            const fullName = `${category}_${tool.name}`;
+            return enabledTools[fullName] !== undefined ? enabledTools[fullName] : true;
+        });
+        const toolNames = activeTools.map(t => t.name);
 
         // 1. Validate action is in the allowed list
         if (!toolNames.includes(action)) {
@@ -459,7 +466,7 @@ export class MCPServer {
         }
 
         // 2. Find matching tool definition
-        const toolDef = allTools.find(t => t.name === action)!;
+        const toolDef = activeTools.find(t => t.name === action)!;
         const schema = toolDef.inputSchema;
         const properties = schema.properties || {};
         const required = schema.required || [];

@@ -11,6 +11,7 @@ interface SnapshotEntry {
 }
 
 export class ValidationTools implements ToolExecutor {
+    private static MAX_SNAPSHOTS = 20;
     private snapshots: Map<string, SnapshotEntry> = new Map();
     private snapshotCounter: number = 0;
 
@@ -154,6 +155,12 @@ export class ValidationTools implements ToolExecutor {
             };
             this.snapshots.set(id, entry);
 
+            // Evict oldest snapshots if over limit
+            while (this.snapshots.size > ValidationTools.MAX_SNAPSHOTS) {
+                const oldest = this.snapshots.keys().next().value;
+                if (oldest) this.snapshots.delete(oldest);
+            }
+
             return {
                 success: true,
                 data: { snapshotId: id, label: entry.label, nodeCount: result.data.nodeCount },
@@ -191,6 +198,8 @@ export class ValidationTools implements ToolExecutor {
                 if (node1.name !== node2.name) changes.push(`name: '${node1.name}' → '${node2.name}'`);
                 if (node1.active !== node2.active) changes.push(`active: ${node1.active} → ${node2.active}`);
                 if (JSON.stringify(node1.position) !== JSON.stringify(node2.position)) changes.push('position changed');
+                if (JSON.stringify(node1.rotation) !== JSON.stringify(node2.rotation)) changes.push('rotation changed');
+                if (JSON.stringify(node1.scale) !== JSON.stringify(node2.scale)) changes.push('scale changed');
                 if (JSON.stringify(node1.components) !== JSON.stringify(node2.components)) changes.push('components changed');
                 if (changes.length > 0) {
                     modified.push({ uuid, name: node2.name, changes });

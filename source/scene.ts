@@ -559,16 +559,18 @@ export const methods: { [key: string]: (...args: any) => any } = {
 
     validateScene(maxDepth: number = 10) {
         try {
+            const cc = require('cc');
             const scene = requireScene();
             const issues: any[] = [];
-            let totalNodes = 0;
-            let totalComponents = 0;
+            let validatedNodes = 0;
+            let validatedComponents = 0;
             let actualMaxDepth = 0;
 
             function walk(node: any, depth: number) {
-                totalNodes++;
                 if (depth > actualMaxDepth) actualMaxDepth = depth;
                 if (depth > maxDepth) return;
+
+                validatedNodes++;
 
                 if (!node.name || node.name.trim() === '') {
                     issues.push({
@@ -581,11 +583,10 @@ export const methods: { [key: string]: (...args: any) => any } = {
                 }
 
                 if (node.components) {
-                    totalComponents += node.components.length;
+                    validatedComponents += node.components.length;
                     for (const comp of node.components) {
                         const typeName = comp.constructor?.name || 'unknown';
                         if (UI_TRANSFORM_DEPENDENTS.includes(typeName)) {
-                            const cc = require('cc');
                             const hasUITransform = node.getComponent(cc.UITransform);
                             if (!hasUITransform) {
                                 issues.push({
@@ -621,7 +622,7 @@ export const methods: { [key: string]: (...args: any) => any } = {
                 data: {
                     valid: issues.filter(i => i.severity === 'error').length === 0,
                     issues,
-                    stats: { totalNodes, totalComponents, totalReferences: 0, maxDepth: actualMaxDepth },
+                    stats: { totalNodes: validatedNodes, totalComponents: validatedComponents, totalReferences: 0, maxDepth: actualMaxDepth },
                 },
             };
         } catch (error: any) {
@@ -656,6 +657,12 @@ export const methods: { [key: string]: (...args: any) => any } = {
                             });
                         }
                     }
+                    if (comp.enabled === false) {
+                        issues.push({
+                            severity: 'info', nodeUuid: node.uuid, nodeName: node.name,
+                            message: `Component ${typeName} is disabled`,
+                        });
+                    }
                 }
             }
 
@@ -681,6 +688,7 @@ export const methods: { [key: string]: (...args: any) => any } = {
             const cc = require('cc');
             const scene = requireScene();
             const issues: any[] = [];
+            const UITransform = cc.UITransform;
 
             function walk(node: any) {
                 if (node.components) {
@@ -688,7 +696,7 @@ export const methods: { [key: string]: (...args: any) => any } = {
                         const typeName = comp.constructor?.name || 'unknown';
                         if (componentType && typeName !== componentType) continue;
                         if (UI_TRANSFORM_DEPENDENTS.includes(typeName)) {
-                            const hasUITransform = node.getComponent(cc.UITransform);
+                            const hasUITransform = node.getComponent(UITransform);
                             if (!hasUITransform) {
                                 issues.push({
                                     severity: 'error', nodeUuid: node.uuid, nodeName: node.name,
@@ -757,6 +765,10 @@ export const methods: { [key: string]: (...args: any) => any } = {
                 }
                 const pos = node.position || node.getPosition?.();
                 if (pos) entry.position = { x: pos.x, y: pos.y, z: pos.z };
+                const rot = node.eulerAngles || node.getRotation?.();
+                if (rot) entry.rotation = { x: rot.x, y: rot.y, z: rot.z };
+                const scl = node.scale || node.getScale?.();
+                if (scl) entry.scale = { x: scl.x, y: scl.y, z: scl.z };
                 nodes.push(entry);
                 if (node.children) { for (const child of node.children) { walk(child); } }
             }
