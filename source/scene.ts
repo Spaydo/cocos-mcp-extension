@@ -1,6 +1,13 @@
 import { join } from 'path';
 module.paths.push(join(Editor.App.path, 'node_modules'));
 
+/** Components that require cc.UITransform as a companion */
+const UI_TRANSFORM_DEPENDENTS = [
+    'Sprite', 'Label', 'Button', 'Layout', 'ScrollView', 'Widget',
+    'RichText', 'EditBox', 'ProgressBar', 'Toggle', 'Slider',
+    'PageView', 'Graphics', 'Mask', 'BlockInputEvents',
+];
+
 /**
  * Scene script - the ONLY place with access to cc.* engine APIs.
  * Called via: Editor.Message.request('scene', 'execute-scene-script', { name, method, args })
@@ -545,6 +552,217 @@ export const methods: { [key: string]: (...args: any) => any } = {
                 data: result !== undefined ? result : null,
                 message: 'Script executed',
             };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    validateScene(maxDepth: number = 10) {
+        try {
+            const scene = requireScene();
+            const issues: any[] = [];
+            let totalNodes = 0;
+            let totalComponents = 0;
+            let actualMaxDepth = 0;
+
+            function walk(node: any, depth: number) {
+                totalNodes++;
+                if (depth > actualMaxDepth) actualMaxDepth = depth;
+                if (depth > maxDepth) return;
+
+                if (!node.name || node.name.trim() === '') {
+                    issues.push({
+                        severity: 'warning',
+                        nodeUuid: node.uuid,
+                        nodeName: node.name || '(empty)',
+                        message: 'Node has empty name',
+                        suggestion: 'Give the node a descriptive name',
+                    });
+                }
+
+                if (node.components) {
+                    totalComponents += node.components.length;
+                    for (const comp of node.components) {
+                        const typeName = comp.constructor?.name || 'unknown';
+                        if (UI_TRANSFORM_DEPENDENTS.includes(typeName)) {
+                            const cc = require('cc');
+                            const hasUITransform = node.getComponent(cc.UITransform);
+                            if (!hasUITransform) {
+                                issues.push({
+                                    severity: 'error',
+                                    nodeUuid: node.uuid,
+                                    nodeName: node.name,
+                                    message: `${typeName} requires UITransform but none found`,
+                                    suggestion: `Add cc.UITransform component to this node`,
+                                });
+                            }
+                        }
+                        if (comp.enabled === false) {
+                            issues.push({
+                                severity: 'info',
+                                nodeUuid: node.uuid,
+                                nodeName: node.name,
+                                message: `Component ${typeName} is disabled`,
+                            });
+                        }
+                    }
+                }
+                if (node.children) {
+                    for (const child of node.children) {
+                        walk(child, depth + 1);
+                    }
+                }
+            }
+
+            walk(scene, 0);
+
+            return {
+                success: true,
+                data: {
+                    valid: issues.filter(i => i.severity === 'error').length === 0,
+                    issues,
+                    stats: { totalNodes, totalComponents, totalReferences: 0, maxDepth: actualMaxDepth },
+                },
+            };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    validateNode(nodeUuid: string) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+            const node = requireNode(scene, nodeUuid);
+            const issues: any[] = [];
+
+            if (!node.name || node.name.trim() === '') {
+                issues.push({
+                    severity: 'warning', nodeUuid: node.uuid, nodeName: node.name || '(empty)',
+                    message: 'Node has empty name', suggestion: 'Give the node a descriptive name',
+                });
+            }
+
+            if (node.components) {
+                for (const comp of node.components) {
+                    const typeName = comp.constructor?.name || 'unknown';
+                    if (UI_TRANSFORM_DEPENDENTS.includes(typeName)) {
+                        const hasUITransform = node.getComponent(cc.UITransform);
+                        if (!hasUITransform) {
+                            issues.push({
+                                severity: 'error', nodeUuid: node.uuid, nodeName: node.name,
+                                message: `${typeName} requires UITransform but none found`,
+                                suggestion: `Add cc.UITransform component to this node`,
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (!node.parent && node !== scene) {
+                issues.push({
+                    severity: 'error', nodeUuid: node.uuid, nodeName: node.name,
+                    message: 'Node has no parent (orphaned)',
+                    suggestion: 'Attach this node to a parent in the scene tree',
+                });
+            }
+
+            return {
+                success: true,
+                data: { valid: issues.filter(i => i.severity === 'error').length === 0, issues, nodeInfo: nodeToInfo(node) },
+            };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    validateComponents(componentType?: string) {
+        try {
+            const cc = require('cc');
+            const scene = requireScene();
+            const issues: any[] = [];
+
+            function walk(node: any) {
+                if (node.components) {
+                    for (const comp of node.components) {
+                        const typeName = comp.constructor?.name || 'unknown';
+                        if (componentType && typeName !== componentType) continue;
+                        if (UI_TRANSFORM_DEPENDENTS.includes(typeName)) {
+                            const hasUITransform = node.getComponent(cc.UITransform);
+                            if (!hasUITransform) {
+                                issues.push({
+                                    severity: 'error', nodeUuid: node.uuid, nodeName: node.name,
+                                    message: `${typeName} requires UITransform but none found`,
+                                    suggestion: `Add cc.UITransform component to node '${node.name}'`,
+                                });
+                            }
+                        }
+                    }
+                }
+                if (node.children) { for (const child of node.children) { walk(child); } }
+            }
+
+            walk(scene);
+            return {
+                success: true,
+                data: { valid: issues.filter(i => i.severity === 'error').length === 0, issues, checkedType: componentType || 'all' },
+            };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    getSceneStats() {
+        try {
+            const scene = requireScene();
+            let totalNodes = 0;
+            let totalComponents = 0;
+            let maxDepth = 0;
+            const componentCounts: Record<string, number> = {};
+
+            function walk(node: any, depth: number) {
+                totalNodes++;
+                if (depth > maxDepth) maxDepth = depth;
+                if (node.components) {
+                    totalComponents += node.components.length;
+                    for (const comp of node.components) {
+                        const typeName = comp.constructor?.name || 'unknown';
+                        componentCounts[typeName] = (componentCounts[typeName] || 0) + 1;
+                    }
+                }
+                if (node.children) { for (const child of node.children) { walk(child, depth + 1); } }
+            }
+
+            walk(scene, 0);
+            return { success: true, data: { totalNodes, totalComponents, maxDepth, componentDistribution: componentCounts } };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    getSceneSnapshot() {
+        try {
+            const scene = requireScene();
+            const nodes: any[] = [];
+
+            function walk(node: any) {
+                const entry: any = {
+                    uuid: node.uuid, name: node.name, active: node.active,
+                    parent: node.parent?.uuid || null,
+                };
+                if (node.components) {
+                    entry.components = node.components.map((c: any) => ({
+                        type: c.constructor?.name || 'unknown', enabled: c.enabled,
+                    }));
+                }
+                const pos = node.position || node.getPosition?.();
+                if (pos) entry.position = { x: pos.x, y: pos.y, z: pos.z };
+                nodes.push(entry);
+                if (node.children) { for (const child of node.children) { walk(child); } }
+            }
+
+            walk(scene);
+            return { success: true, data: { timestamp: Date.now(), nodeCount: nodes.length, nodes } };
         } catch (error: any) {
             return { success: false, error: error.message };
         }

@@ -159,5 +159,13 @@ module.exports = {
         'animation_play': '播放節點上的動畫剪輯',
         'animation_stop': '停止節點上的動畫',
         'animation_set_clip': '設定預設動畫剪輯或節點上的動畫屬性',
+
+        // validation
+        'validation_validate_scene': '完整場景健康檢查：節點完整性、缺失組件、空名稱',
+        'validation_validate_node': '深度驗證單一節點及其組件',
+        'validation_validate_components': '查找缺少必要組件的節點',
+        'validation_take_snapshot': '擷取當前場景狀態作為命名快照以供比較',
+        'validation_compare_snapshots': '比較兩個快照以查看變更內容',
+        'validation_get_scene_stats': '取得場景統計：節點數、組件數、層級深度',
     },
 };

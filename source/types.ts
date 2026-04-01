@@ -20,6 +20,7 @@ export const DEFAULT_ENABLED_CATEGORIES: Record<string, boolean> = {
     prefab: true,
     project: true,
     debug: true,
+    validation: true,
     scene_view: false,
     editor: false,
     reference_image: false,
@@ -48,11 +49,34 @@ export interface ToolResponse {
     data?: any;
     message?: string;
     error?: string;
+    refreshed?: 'scene' | 'asset';
+    refreshWarning?: string;
 }
 
 export interface ToolExecutor {
     getTools(): ToolDefinition[];
     execute(toolName: string, args: any): Promise<ToolResponse>;
+}
+
+// === Validation Types ===
+
+export interface ValidationIssue {
+    severity: 'error' | 'warning' | 'info';
+    nodeUuid?: string;
+    nodeName?: string;
+    message: string;
+    suggestion?: string;
+}
+
+export interface ValidationResult {
+    valid: boolean;
+    issues: ValidationIssue[];
+    stats?: {
+        totalNodes: number;
+        totalComponents: number;
+        totalReferences: number;
+        maxDepth: number;
+    };
 }
 
 // === Domain Types ===

@@ -81,6 +81,52 @@ export class MCPServer {
         editor: 'Editor environment (preferences, info, devices)',
         reference_image: 'Reference image overlay management',
         animation: 'Animation playback control',
+        validation: 'Scene validation and health checking',
+    };
+
+    private static REFRESH_MAP: Record<string, 'scene' | 'asset'> = {
+        // Node operations
+        'node.create': 'scene',
+        'node.delete': 'scene',
+        'node.set_property': 'scene',
+        'node.duplicate': 'scene',
+        'node.reset_transform': 'scene',
+        'node.move': 'scene',
+
+        // Component operations
+        'component.add': 'scene',
+        'component.remove': 'scene',
+        'component.set_property': 'scene',
+        'component.reset': 'scene',
+        'component.execute_method': 'scene',
+
+        // Animation operations
+        'animation.play': 'scene',
+        'animation.stop': 'scene',
+        'animation.set_clip': 'scene',
+
+        // Debug (script execution may modify scene)
+        'debug.execute_script': 'scene',
+
+        // Prefab operations (scene)
+        'prefab.instantiate': 'scene',
+        'prefab.restore': 'scene',
+
+        // Asset operations
+        'asset.create': 'asset',
+        'asset.delete': 'asset',
+        'asset.move': 'asset',
+        'asset.import': 'asset',
+        'asset.copy': 'asset',
+        'asset.save': 'asset',
+        'asset.reimport': 'asset',
+
+        // Prefab operations (asset)
+        'prefab.create': 'asset',
+        'prefab.create_empty': 'asset',
+
+        // Scene operations
+        'scene.create': 'asset',
     };
 
     private buildDescription(category: string, tools: ToolDefinition[]): string {
@@ -383,11 +429,107 @@ export class MCPServer {
             throw new Error(`Missing "action" parameter for tool "${toolName}". Check available actions in the tool description.`);
         }
 
+        // Validate arguments against schema
+        this.validateArgs(toolName, action, args);
+
         this.log(`[MCP] Executing: ${toolName}.${action}`);
         const result = await executor.execute(action, args);
         this.log(`[MCP] Result: ${result.success ? 'OK' : 'FAIL'}`);
 
+        // Auto-refresh editor after write operations
+        await this.autoRefresh(toolName, action, result);
+
         return result;
+    }
+
+    /**
+     * Validate tool arguments against the tool's inputSchema.
+     * Throws descriptive errors for invalid action, missing required params, or type mismatches.
+     */
+    private validateArgs(category: string, action: string, args: any): void {
+        const executor = this.tools[category];
+        const allTools = executor.getTools();
+        const toolNames = allTools.map(t => t.name);
+
+        // 1. Validate action is in the allowed list
+        if (!toolNames.includes(action)) {
+            throw new Error(
+                `Invalid action '${action}' for tool '${category}'. Available actions: ${toolNames.join(', ')}`
+            );
+        }
+
+        // 2. Find matching tool definition
+        const toolDef = allTools.find(t => t.name === action)!;
+        const schema = toolDef.inputSchema;
+        const properties = schema.properties || {};
+        const required = schema.required || [];
+
+        // 3. Check required parameters
+        const missing: string[] = [];
+        for (const paramName of required) {
+            if (args[paramName] === undefined || args[paramName] === null) {
+                missing.push(paramName);
+            }
+        }
+        if (missing.length > 0) {
+            const paramList = Object.entries(properties)
+                .map(([name, def]: [string, any]) => {
+                    const isReq = required.includes(name);
+                    return `${name}${isReq ? '' : '?'} (${def.type || 'any'})`;
+                })
+                .join(', ');
+            throw new Error(
+                `Missing required parameter${missing.length > 1 ? 's' : ''} '${missing.join("', '")}' for action '${category}.${action}'. Expected parameters: ${paramList}`
+            );
+        }
+
+        // 4. Type-check provided parameters
+        for (const [paramName, paramDef] of Object.entries(properties) as [string, any][]) {
+            const value = args[paramName];
+            if (value === undefined || value === null) continue;
+
+            const expectedType = paramDef.type;
+            if (!expectedType) continue;
+
+            let valid = true;
+            switch (expectedType) {
+                case 'string':  valid = typeof value === 'string'; break;
+                case 'number':  valid = typeof value === 'number'; break;
+                case 'boolean': valid = typeof value === 'boolean'; break;
+                case 'object':  valid = typeof value === 'object' && !Array.isArray(value); break;
+                case 'array':   valid = Array.isArray(value); break;
+            }
+
+            if (!valid) {
+                throw new Error(
+                    `Type mismatch for parameter '${paramName}' in action '${category}.${action}': expected ${expectedType}, got ${Array.isArray(value) ? 'array' : typeof value}`
+                );
+            }
+        }
+    }
+
+    /**
+     * Automatically refresh the editor after a successful write operation.
+     * Uses REFRESH_MAP to determine refresh type. Never throws — refresh
+     * failures are reported as warnings, not errors.
+     */
+    private async autoRefresh(toolName: string, action: string, result: ToolResponse): Promise<void> {
+        const key = `${toolName}.${action}`;
+        const refreshType = MCPServer.REFRESH_MAP[key];
+        if (!refreshType || !result.success) return;
+
+        try {
+            if (refreshType === 'scene') {
+                await Editor.Message.request('scene', 'soft-reload');
+            } else if (refreshType === 'asset') {
+                await Editor.Message.request('asset-db', 'refresh-asset', 'db://assets');
+            }
+            result.refreshed = refreshType;
+            this.log(`[MCP] Auto-refreshed: ${refreshType}`);
+        } catch (err: any) {
+            result.refreshWarning = `Auto-refresh failed: ${err.message}`;
+            this.log(`[MCP] Auto-refresh warning: ${err.message}`);
+        }
     }
 
     // === Logging ===

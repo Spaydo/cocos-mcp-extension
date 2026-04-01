@@ -159,5 +159,13 @@ module.exports = {
         'animation_play': 'Play an animation clip on a node',
         'animation_stop': 'Stop animation on a node',
         'animation_set_clip': 'Set default animation clip or animation properties on a node',
+
+        // validation
+        'validation_validate_scene': 'Full scene health check: node integrity, missing components, empty names',
+        'validation_validate_node': 'Deep validation of a single node and its components',
+        'validation_validate_components': 'Find nodes missing required companion components',
+        'validation_take_snapshot': 'Capture current scene state as a named snapshot for comparison',
+        'validation_compare_snapshots': 'Compare two snapshots to see what changed',
+        'validation_get_scene_stats': 'Get scene statistics: node count, component count, depth',
     },
 };

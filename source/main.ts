@@ -14,6 +14,7 @@ import { SceneViewTools } from './tools/scene-view-tools';
 import { EditorTools } from './tools/editor-tools';
 import { ReferenceImageTools } from './tools/reference-image-tools';
 import { AnimationTools } from './tools/animation-tools';
+import { ValidationTools } from './tools/validation-tools';
 
 let mcpServer: MCPServer | null = null;
 let editorVersion: string = '';
@@ -151,6 +152,7 @@ export function load() {
     mcpServer.registerToolCategory('editor', new EditorTools());
     mcpServer.registerToolCategory('reference_image', new ReferenceImageTools());
     mcpServer.registerToolCategory('animation', new AnimationTools());
+    mcpServer.registerToolCategory('validation', new ValidationTools());
 
     // 6. Auto-start if configured
     if (settings.autoStart) {
