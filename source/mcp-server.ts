@@ -1,49 +1,5 @@
 import * as http from 'http';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
 import { ToolDefinition, ToolResponse, ToolExecutor, MCPServerSettings } from './types';
-
-const REGISTRY_PATH = join(require('os').homedir(), '.cocos-mcp-registry.json');
-
-interface RegistryEntry {
-    port: number;
-    projectPath: string;
-    pid: number;
-    startedAt: string;
-}
-
-function readRegistry(): RegistryEntry[] {
-    try {
-        if (existsSync(REGISTRY_PATH)) {
-            const data = JSON.parse(readFileSync(REGISTRY_PATH, 'utf-8'));
-            const entries: RegistryEntry[] = data.instances || [];
-            // Clean stale entries (PID no longer running)
-            return entries.filter(e => {
-                try { process.kill(e.pid, 0); return true; } catch { return false; }
-            });
-        }
-    } catch {}
-    return [];
-}
-
-function writeRegistry(entries: RegistryEntry[]): void {
-    try {
-        writeFileSync(REGISTRY_PATH, JSON.stringify({ instances: entries }, null, 2), 'utf-8');
-    } catch (err) {
-        console.warn('[MCP] Failed to write registry:', err);
-    }
-}
-
-function registerInstance(port: number, projectPath: string): void {
-    const entries = readRegistry().filter(e => e.projectPath !== projectPath);
-    entries.push({ port, projectPath, pid: process.pid, startedAt: new Date().toISOString() });
-    writeRegistry(entries);
-}
-
-function unregisterInstance(): void {
-    const entries = readRegistry().filter(e => e.pid !== process.pid);
-    writeRegistry(entries);
-}
 
 const SERVER_INFO = {
     name: 'cocos-mcp-extension',
@@ -59,7 +15,6 @@ export class MCPServer {
     private toolsList: ToolDefinition[] = [];
     private actionCount: number = 0;
     private enableDebugLog: boolean = false;
-    private actualPort: number = 0;
 
     constructor(settings: MCPServerSettings) {
         this.settings = settings;
@@ -278,43 +233,23 @@ export class MCPServer {
 
             this.setupTools();
 
-            const maxAttempts = 11; // Try configured port + 10 more
-            let attempt = 0;
-            const basePort = this.settings.port;
+            this.httpServer = http.createServer(this.handleHttpRequest.bind(this));
 
-            const tryPort = (port: number) => {
-                const server = http.createServer(this.handleHttpRequest.bind(this));
+            this.httpServer.on('error', (err: NodeJS.ErrnoException) => {
+                if (err.code === 'EADDRINUSE') {
+                    console.error(`[MCP] Port ${this.settings.port} is already in use`);
+                    this.httpServer = null;
+                    reject(new Error(`Port ${this.settings.port} is already in use`));
+                } else {
+                    console.error('[MCP] Server error:', err);
+                    reject(err);
+                }
+            });
 
-                server.on('error', (err: NodeJS.ErrnoException) => {
-                    if (err.code === 'EADDRINUSE' && attempt < maxAttempts - 1) {
-                        attempt++;
-                        const nextPort = basePort + attempt;
-                        console.warn(`[MCP] Port ${port} in use, trying ${nextPort}...`);
-                        tryPort(nextPort);
-                    } else if (err.code === 'EADDRINUSE') {
-                        console.error(`[MCP] All ports ${basePort}-${basePort + maxAttempts - 1} are in use`);
-                        reject(new Error(`All ports ${basePort}-${basePort + maxAttempts - 1} are in use`));
-                    } else {
-                        console.error('[MCP] Server error:', err);
-                        reject(err);
-                    }
-                });
-
-                server.listen(port, '127.0.0.1', () => {
-                    this.httpServer = server;
-                    this.actualPort = port;
-                    // Register in global registry
-                    try {
-                        registerInstance(port, Editor.Project.path);
-                    } catch (e) {
-                        console.warn('[MCP] Failed to register instance:', e);
-                    }
-                    console.log(`[MCP] Server started on http://127.0.0.1:${port}/mcp`);
-                    resolve();
-                });
-            };
-
-            tryPort(basePort);
+            this.httpServer.listen(this.settings.port, '127.0.0.1', () => {
+                console.log(`[MCP] Server started on http://127.0.0.1:${this.settings.port}/mcp`);
+                resolve();
+            });
         });
     }
 
@@ -322,7 +257,6 @@ export class MCPServer {
         if (this.httpServer) {
             this.httpServer.close();
             this.httpServer = null;
-            unregisterInstance();
             console.log('[MCP] Server stopped');
         }
     }
@@ -337,10 +271,6 @@ export class MCPServer {
 
     getActionCount(): number {
         return this.actionCount;
-    }
-
-    getActualPort(): number {
-        return this.actualPort;
     }
 
     updateSettings(settings: MCPServerSettings): void {
@@ -378,14 +308,11 @@ export class MCPServer {
     }
 
     private handleHealth(res: http.ServerResponse): void {
-        let projectPath = '';
-        try { projectPath = Editor.Project.path; } catch {}
         res.writeHead(200);
         res.end(JSON.stringify({
             status: 'ok',
             tools: this.toolsList.length,
             actions: this.actionCount,
-            projectPath,
             server: SERVER_INFO,
         }));
     }
