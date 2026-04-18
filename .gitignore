@@ -48,3 +48,8 @@ logs/
 *.cache
 
 node_modules/
+
+# Bridge build artifacts (committed for installable distribution)
+# Uncomment to exclude:
+# bridge/dist/
+# extension/dist/
