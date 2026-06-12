@@ -94,6 +94,6 @@ node test/verify-3c.mjs  # live verification: peripheral tools
 | | 3.8.4 | 3.8.8 |
 |---|---|---|
 | Embedded Node | 14.16 (Electron 13) | 20.15 (Electron 31) |
-| Status | ✅ fully verified live | ✅ supported (adapter layer) |
+| Status | ✅ fully verified live | ✅ fully verified live |
 
 All cross-version differences (`create-node` result type, `query-components` shape, protected message migrations...) are centralized in `source/adapters.ts`; check current capability flags via `project.info`.

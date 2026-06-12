@@ -104,6 +104,6 @@ node test/verify-3c.mjs  # 實機驗證：周邊工具（需編輯器開啟）
 | | 3.8.4 | 3.8.8 |
 |---|---|---|
 | 編輯器內建 Node | 14.16（Electron 13） | 20.15（Electron 31） |
-| 支援狀態 | ✅ 完整實機驗證 | ✅ 支援（adapter 吸收差異） |
+| 支援狀態 | ✅ 完整實機驗證 | ✅ 完整實機驗證 |
 
 跨版差異（如 `create-node` 回傳型別、`query-components` 結構、protected message 遷移）全部集中在 `source/adapters.ts` 與版本能力表（`project.info` 可查看當前能力旗標）。

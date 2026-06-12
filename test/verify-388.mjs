@@ -99,7 +99,14 @@ await step('node.create（3.8.8 原生回 string 的正規化路徑）', async (
     const r = await call('node', 'create', { name: 'MCP_388_Test', position: { x: 1, y: 2, z: 3 } });
     nodeUuid = r.uuid;
     if (typeof nodeUuid !== 'string' || !nodeUuid) throw new Error(`uuid=${JSON.stringify(nodeUuid)}`);
-    const q = await call('node', 'query', { uuid: nodeUuid });
+    // 3.8.8 偶發：create 回傳後極短時間內 query-node 可能還查不到 → 重試一次
+    let q;
+    try {
+        q = await call('node', 'query', { uuid: nodeUuid });
+    } catch {
+        await sleep(400);
+        q = await call('node', 'query', { uuid: nodeUuid });
+    }
     if (Math.abs(q.position.x - 1) > 0.01) throw new Error(`pos=${JSON.stringify(q.position)}`);
 });
 await step('node.query_tree（3.8.8 result INode 正規化）', async () => {
@@ -169,7 +176,10 @@ console.log('\n[scene.save（3.8.8 回場景 uuid）]');
             if (!r.uuid) throw new Error('3.8.8 預期回傳場景 uuid，但 uuid 為空');
         });
         if (createdSceneUrl) {
-            await step('刪除測試場景資產（編輯器中留著已開啟的場景屬預期）', async () => {
+            await step('關閉場景後刪除測試場景資產', async () => {
+                // 先 close 再刪：刪除「開啟中場景」的資產會讓編輯器自動生成恢復檔（scene.scene）
+                await call('scene', 'close');
+                await sleep(500);
                 await call('asset', 'delete', { uuid: createdSceneUrl });
             });
         }
