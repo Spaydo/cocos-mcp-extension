@@ -346,6 +346,38 @@ console.log('\n[3c] bootstrap launcher (path-free universal command)');
     rmSync(BOOT, { recursive: true, force: true });
 }
 
+// ---------- 3d. 過期 discovery（埠被其他編輯器接手 → token 不匹配） ----------
+console.log('\n[3d] stale discovery (port owned by another editor)');
+{
+    const { realpathSync, writeFileSync: wf } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const STALE = join(realpathSync(tmpdir()), 'cocos-mcp-stale-root');
+    rmSync(STALE, { recursive: true, force: true });
+    mkdirSync(STALE, { recursive: true });
+    wf(join(STALE, 'package.json'), JSON.stringify({ name: 's', creator: { version: '3.8.4' } }));
+    // discovery 指向「活著的測試 bridge」但 token 是錯的（模擬埠被別的編輯器接手）
+    discovery.writeBridgeInfo(STALE, {
+        port,
+        token: 'stale-token-from-previous-session',
+        pid: 0,
+        editorVersion: '3.8.4-test',
+        projectPath: STALE,
+        startedAt: new Date().toISOString(),
+    });
+    const client = new McpStdioClient({ args: ['--project', STALE] });
+    await client.init();
+    const call = await client.request('tools/call', {
+        name: 'project',
+        arguments: { action: 'info' },
+    });
+    check('token 不匹配 → 視為編輯器離線（非 Unauthorized 透傳）',
+        call.result.isError === true &&
+        call.result.content[0].text.includes('not reachable') &&
+        !call.result.content[0].text.includes('Unauthorized'));
+    client.kill();
+    rmSync(STALE, { recursive: true, force: true });
+}
+
 // ---------- 4. 編輯器離線情境 ----------
 console.log('\n[4] offline behavior');
 {

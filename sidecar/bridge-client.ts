@@ -74,7 +74,10 @@ export class BridgeClient {
         });
     }
 
-    /** 編輯器是否在線（bridge 可達） */
+    /**
+     * 編輯器是否在線（bridge 可達且「屬於本專案」）。
+     * 埠可能被其他專案/版本的編輯器接手（舊 discovery 過期）→ 必須驗 projectPath。
+     */
     async healthy(): Promise<boolean> {
         const info = this.readDiscovery();
         if (!info) return false;
@@ -83,18 +86,21 @@ export class BridgeClient {
                 signal: AbortSignal.timeout(2000),
             });
             if (!res.ok) return false;
-            const body = (await res.json()) as { name?: string };
-            return body.name === 'cocos-mcp-bridge';
+            const body = (await res.json()) as { name?: string; projectPath?: string };
+            return body.name === 'cocos-mcp-bridge' && body.projectPath === this.projectPath;
         } catch {
             return false;
         }
     }
 
-    /** 即時抓工具目錄（bridge 必須在線） */
+    /** 即時抓工具目錄（bridge 必須在線且屬於本專案） */
     async fetchTools(): Promise<McpToolSpec[]> {
         const info = this.readDiscovery();
         if (!info) {
             throw new BridgeUnavailableError('No bridge discovery file found');
+        }
+        if (!(await this.healthy())) {
+            throw new BridgeUnavailableError('Bridge is not reachable or belongs to a different project');
         }
         const res = await this.request(info, '/tools', { method: 'GET' }, TOOLS_TIMEOUT_MS);
         if (!res.ok) {
@@ -156,6 +162,15 @@ export class BridgeClient {
             if (fresh && fresh.token !== info.token) {
                 res = await doCall(fresh);
             }
+        }
+
+        if (res.status === 401) {
+            // 重試後仍 401：discovery 過期、埠被其他專案/版本的編輯器接手
+            // → 對「本專案」而言等同編輯器離線，不能把 Unauthorized 透傳給呼叫端
+            throw new BridgeUnavailableError(
+                'Bridge token mismatch: the port in the discovery file is now owned by a different ' +
+                'editor instance (stale discovery). The editor for this project is probably not running.',
+            );
         }
 
         if (!res.ok && res.status !== 200) {

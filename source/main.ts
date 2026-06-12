@@ -160,6 +160,8 @@ export async function load(): Promise<void> {
             await startBridge();
         } catch (err) {
             console.error('[cocos-mcp] bridge auto-start failed:', err);
+            // 啟動失敗時清掉殘留的 discovery，避免 sidecar 連到舊埠（可能已被其他編輯器接手）
+            clearBridgeInfo(Editor.Project.path);
         }
     }
 }
