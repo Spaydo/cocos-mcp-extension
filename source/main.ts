@@ -16,13 +16,12 @@ let bridge: BridgeServer | null = null;
 
 function buildRegistry(): ToolRegistry {
     const reg = new ToolRegistry();
-    // 動態 require（非頂層 import）：讓 dev.reload_tools 清掉 require cache 後能載入新代碼
+    // 動態 require（非頂層 import）：讓 dev.reload_tools 清掉 require cache 後能載入新代碼，
+    // 工具清單由 tools/index.ts 維護（新增工具也可熱載入）
     /* eslint-disable @typescript-eslint/no-var-requires */
-    reg.register(require('./tools/project').createProjectTool());
-    reg.register(require('./tools/scene').createSceneTool());
-    reg.register(require('./tools/node').createNodeTool());
-    reg.register(require('./tools/component').createComponentTool());
-    reg.register(require('./tools/asset').createAssetTool());
+    for (const def of require('./tools').createAllTools()) {
+        reg.register(def);
+    }
     /* eslint-enable @typescript-eslint/no-var-requires */
     reg.register({
         name: 'dev',

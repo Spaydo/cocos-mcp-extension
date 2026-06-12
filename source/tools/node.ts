@@ -86,7 +86,12 @@ export function createNodeTool(): ToolDef {
                     const options: Record<string, any> = {};
                     if (args.name) options.name = String(args.name);
                     if (args.parent) options.parent = String(args.parent);
-                    if (args.asset_uuid) options.assetUuid = String(args.asset_uuid);
+                    if (args.asset_uuid) {
+                        options.assetUuid = String(args.asset_uuid);
+                        // createNodeFromAsset 需要 type（資源的 cc 型別，實測必要）→ 自動查詢
+                        const info = await request('asset-db', 'query-asset-info', options.assetUuid);
+                        if (info && info.type) options.type = String(info.type);
+                    }
                     if (args.keep_world_transform) options.keepWorldTransform = true;
                     if (args.unlink_prefab) options.unlinkPrefab = true;
                     const result = await request('scene', 'create-node', options);

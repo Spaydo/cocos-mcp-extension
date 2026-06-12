@@ -848,7 +848,13 @@ export interface CreateNodeOptions {
     assetUuid?: string;            // 有资源 id 则从资源内创建对应的节点（prefab/图片/模型等）
     nameIncrease?: boolean;        // 名称自增 xxx001 -> xxx002
     snapshot?: boolean;            // 是否记录 undo 快照
-    type?: string;                 // 资源类型（createNodeFromAsset 用）
+    /**
+     * 资源类型（createNodeFromAsset 用）
+     * ⚠ 實測備註（2026-06-12，3.8.4 編輯器）：帶 assetUuid 從資源建立節點時「必須」同時傳 type
+     * （如 'cc.Prefab'），否則 prefab 連結不會建立（query-nodes-by-asset-uuid 查不到、
+     * dump 無 __prefab__）。
+     */
+    type?: string;
     unlinkPrefab?: boolean;        // 创建后取消 prefab 状态
     /**
      * 指定生成的位置

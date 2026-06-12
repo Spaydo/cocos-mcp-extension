@@ -1022,6 +1022,10 @@ export interface FilterPluginOptions {
 
 用途：查詢專案設定中某外掛的設定值，可指定 default 或 project 層級。
 
+> ⚠ **實測備註（2026-06-12，3.8.4）**：`query-config` / `set-config`（project 與 preferences 皆同）
+> 只對「有註冊 profile contribution 的套件」有效；未註冊的 pkg 查詢回 `null`、寫入靜默無效
+> （不報錯）。可用的官方 pkg 例：project、engine（專案設定）；device（偏好設定）。
+
 #### `set-config`
 
 ```typescript
