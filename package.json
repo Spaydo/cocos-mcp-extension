@@ -2,12 +2,15 @@
     "$schema": "./@types/schema/package/index.json",
     "package_version": 2,
     "name": "cocos-mcp-extension",
-    "version": "1.0.0",
+    "version": "2.0.0-alpha.1",
     "author": "TaiMacro",
     "editor": ">=3.8.4",
     "scripts": {
         "preinstall": "node ./scripts/preinstall.js",
-        "build": "tsc"
+        "build": "npm run build:editor && npm run build:sidecar",
+        "build:editor": "tsc -p tsconfig.json",
+        "build:sidecar": "tsc -p tsconfig.sidecar.json",
+        "test": "node test/run-tests.mjs"
     },
     "description": "i18n:cocos-mcp-extension.description",
     "main": "./dist/main.js",
@@ -15,6 +18,9 @@
         "@cocos/creator-types": "^3.8.4",
         "@types/node": "^18.17.1",
         "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0"
     },
     "panels": {
         "default": {
@@ -56,16 +62,6 @@
             "get-server-status": {
                 "methods": [
                     "getServerStatus"
-                ]
-            },
-            "update-settings": {
-                "methods": [
-                    "updateSettings"
-                ]
-            },
-            "get-categories": {
-                "methods": [
-                    "getCategories"
                 ]
             }
         },

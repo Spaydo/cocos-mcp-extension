@@ -1,53 +1,45 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+/**
+ * 設定讀寫：<專案>/profiles/cocos-mcp.json
+ * （沿用舊版的檔案式設定模式，但 schema 重新定義）
+ */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { MCPServerSettings, DEFAULT_ENABLED_CATEGORIES } from './types';
+import { BridgeSettings, DEFAULT_SETTINGS } from './types';
 
-const SETTINGS_FILE = 'mcp-extension.json';
+const SETTINGS_FILE = 'cocos-mcp.json';
 
-const DEFAULT_SETTINGS: MCPServerSettings = {
-    port: 3000,
-    autoStart: false,
-    enableDebugLog: false,
-    enabledCategories: { ...DEFAULT_ENABLED_CATEGORIES },
-    enabledTools: {},
-};
-
-function getSettingsDir(): string {
-    const dir = join(Editor.Project.path, 'profiles');
+function settingsPath(projectPath: string): string {
+    const dir = join(projectPath, 'profiles');
     if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
     }
-    return dir;
+    return join(dir, SETTINGS_FILE);
 }
 
-function getSettingsPath(): string {
-    return join(getSettingsDir(), SETTINGS_FILE);
-}
-
-export function readSettings(): MCPServerSettings {
+export function readSettings(projectPath: string): BridgeSettings {
     try {
-        const filePath = getSettingsPath();
-        if (existsSync(filePath)) {
-            const content = readFileSync(filePath, 'utf-8');
-            const saved = JSON.parse(content);
+        const file = settingsPath(projectPath);
+        if (existsSync(file)) {
+            const saved = JSON.parse(readFileSync(file, 'utf-8'));
             return {
-                ...DEFAULT_SETTINGS,
-                ...saved,
-                enabledCategories: { ...DEFAULT_ENABLED_CATEGORIES, ...saved.enabledCategories },
-                enabledTools: saved.enabledTools || {},
+                port: Number(saved.port) > 0 ? Number(saved.port) : DEFAULT_SETTINGS.port,
+                autoStart: typeof saved.autoStart === 'boolean' ? saved.autoStart : DEFAULT_SETTINGS.autoStart,
+                requestTimeoutMs:
+                    Number(saved.requestTimeoutMs) > 0
+                        ? Number(saved.requestTimeoutMs)
+                        : DEFAULT_SETTINGS.requestTimeoutMs,
             };
         }
     } catch (err) {
-        console.warn('[MCP] Failed to read settings, using defaults:', err);
+        console.warn('[cocos-mcp] 讀取設定失敗，使用預設值：', err);
     }
     return { ...DEFAULT_SETTINGS };
 }
 
-export function saveSettings(settings: MCPServerSettings): void {
+export function saveSettings(projectPath: string, settings: BridgeSettings): void {
     try {
-        const filePath = getSettingsPath();
-        writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
+        writeFileSync(settingsPath(projectPath), JSON.stringify(settings, null, 2), 'utf-8');
     } catch (err) {
-        console.error('[MCP] Failed to save settings:', err);
+        console.error('[cocos-mcp] 寫入設定失敗：', err);
     }
 }

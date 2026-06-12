@@ -1,0 +1,23 @@
+{
+    "$schema": "https://schemastore.azurewebsites.net/schemas/json/tsconfig.json",
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "Node16",
+        "moduleResolution": "Node16",
+        "outDir": "./dist-sidecar",
+        "rootDir": "./sidecar",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "inlineSourceMap": true,
+        "inlineSources": true,
+        "types": [
+            "node"
+        ]
+    },
+    "include": [
+        "sidecar"
+    ]
+}

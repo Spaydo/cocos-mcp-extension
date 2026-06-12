@@ -48,3 +48,5 @@ logs/
 *.cache
 
 node_modules/
+# cocos-mcp
+test/.tmp-project/

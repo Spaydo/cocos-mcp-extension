@@ -1,114 +1,108 @@
 /**
- * Shared interfaces for cocos-mcp-extension
+ * 共用型別定義（編輯器端）。
+ * 注意：此檔案會被編譯為 Node 14 可執行的 CJS（3.8.4 編輯器內建 Node 14.16）。
  */
 
-// === Server Configuration ===
-
-export interface MCPServerSettings {
+/** Bridge 設定（存於 <專案>/profiles/cocos-mcp.json） */
+export interface BridgeSettings {
+    /** Bridge HTTP 埠（實際使用埠可能因衝突向後偏移，見 discovery 檔） */
     port: number;
+    /** 編輯器啟動時自動開啟 bridge */
     autoStart: boolean;
-    enableDebugLog: boolean;
-    enabledCategories: Record<string, boolean>;
-    enabledTools: Record<string, boolean>;
+    /** 單一 action 的執行逾時（毫秒） */
+    requestTimeoutMs: number;
 }
 
-export const DEFAULT_ENABLED_CATEGORIES: Record<string, boolean> = {
-    scene: true,
-    node: true,
-    component: true,
-    asset: true,
-    prefab: true,
-    project: true,
-    debug: true,
-    validation: true,
-    scene_view: false,
-    editor: false,
-    reference_image: false,
-    animation: false,
-    broadcast: false,
-    file_editor: false,
+export const DEFAULT_SETTINGS: BridgeSettings = {
+    port: 8585,
+    autoStart: true,
+    requestTimeoutMs: 15000,
 };
 
-export interface ServerStatus {
-    running: boolean;
-    port: number;
+export interface EditorVersion {
+    major: number;
+    minor: number;
+    patch: number;
+    raw: string;
 }
 
-// === Tool System ===
+/**
+ * 版本能力表。依據 docs/api-reference/07-version-diff-summary.md。
+ * 只支援 3.8.4 與 3.8.8 兩版，不對其他版本做推測。
+ */
+export interface Capabilities {
+    /** 3.8.8：create-node result 為 string；3.8.4 為 string[] */
+    createNodeReturnsString: boolean;
+    /** 3.8.8：query-asset-users / query-asset-dependencies 為公開 message（3.8.4 為 protected） */
+    assetUsersPublic: boolean;
+    /** 3.8.8：多場景 facade（multiOpenScene 等） */
+    multiScene: boolean;
+    /** 3.8.8：CreateNodeOptions.autoAdaptToCreate */
+    autoAdaptToCreate: boolean;
+    /** 3.8.4：save-as-scene params 須傳 [boolean]；3.8.8 為 [] */
+    saveAsSceneNeedsFlag: boolean;
+}
 
-export interface ToolDefinition {
+export interface EditorEnv {
+    version: EditorVersion;
+    capabilities: Capabilities;
+}
+
+/** 傳給每個 action handler 的執行環境 */
+export interface ToolContext {
+    env: EditorEnv;
+    settings: BridgeSettings;
+}
+
+/** 單一 action 定義 */
+export interface ActionDef {
+    /** 英文描述（面向 LLM 的工具說明） */
+    description: string;
+    /** args 的 JSON Schema properties（不含 action 欄位本身） */
+    params?: Record<string, unknown>;
+    /** 此 action 必填的參數名 */
+    required?: string[];
+    handler(args: Record<string, any>, ctx: ToolContext): Promise<unknown>;
+}
+
+/** 合併式工具定義（一個 tool 多個 action） */
+export interface ToolDef {
     name: string;
     description: string;
-    inputSchema: {
-        type: 'object';
-        properties: Record<string, any>;
-        required?: string[];
-    };
+    actions: Record<string, ActionDef>;
 }
 
-export interface ToolResponse {
-    success: boolean;
-    data?: any;
-    message?: string;
-    error?: string;
-    refreshed?: 'scene' | 'asset';
-    refreshWarning?: string;
+/** Sidecar → Bridge 的 RPC 請求 */
+export interface RpcRequest {
+    tool: string;
+    action: string;
+    args?: Record<string, unknown>;
 }
 
-export interface ToolExecutor {
-    getTools(): ToolDefinition[];
-    execute(toolName: string, args: any): Promise<ToolResponse>;
-}
+export type RpcErrorCode =
+    | 'UNKNOWN_TOOL'
+    | 'UNKNOWN_ACTION'
+    | 'BAD_ARGS'
+    | 'TIMEOUT'
+    | 'EDITOR_ERROR';
 
-// === Validation Types ===
+export type RpcResponse =
+    | { ok: true; data: unknown }
+    | { ok: false; error: { code: RpcErrorCode; message: string; hint?: string } };
 
-export interface ValidationIssue {
-    severity: 'error' | 'warning' | 'info';
-    nodeUuid?: string;
-    nodeName?: string;
-    message: string;
-    suggestion?: string;
-}
-
-export interface ValidationResult {
-    valid: boolean;
-    issues: ValidationIssue[];
-    stats?: {
-        totalNodes: number;
-        totalComponents: number;
-        totalReferences: number;
-        maxDepth: number;
-    };
-}
-
-// === Domain Types ===
-
-export interface NodeInfo {
-    uuid: string;
+/** 提供給 MCP 客戶端的工具描述（對應 MCP Tool 物件） */
+export interface McpToolSpec {
     name: string;
-    active: boolean;
-    position?: { x: number; y: number; z: number };
-    rotation?: { x: number; y: number; z: number };
-    scale?: { x: number; y: number; z: number };
-    parent?: string;
-    children?: string[];
-    components?: ComponentInfo[];
+    description: string;
+    inputSchema: Record<string, unknown>;
 }
 
-export interface ComponentInfo {
-    type: string;
-    enabled: boolean;
-}
-
-export interface SceneInfo {
-    name: string;
-    uuid: string;
-    path?: string;
-}
-
-export interface AssetInfo {
-    name: string;
-    uuid: string;
-    url: string;
-    type: string;
+/** discovery 檔內容（<專案>/temp/cocos-mcp/bridge.json） */
+export interface BridgeInfo {
+    port: number;
+    token: string;
+    pid: number;
+    editorVersion: string;
+    projectPath: string;
+    startedAt: string;
 }
