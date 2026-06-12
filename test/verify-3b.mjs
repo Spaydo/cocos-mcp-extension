@@ -82,10 +82,10 @@ await rpc('initialize', {
 child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
 
 console.log('\n[工具目錄]');
-const tools = await step('tools/list 回 6 個工具', async () => {
+const tools = await step('tools/list 回 9 個工具', async () => {
     const res = await rpc('tools/list', {});
     const names = res.result.tools.map((t) => t.name).sort();
-    if (names.join(',') !== 'asset,component,dev,node,project,scene') {
+    if (names.join(',') !== 'asset,component,dev,editor,node,prefab,project,scene,scene_view') {
         throw new Error(`got: ${names.join(',')}（擴展可能尚未重新載入）`);
     }
     return names;

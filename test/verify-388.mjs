@@ -130,13 +130,37 @@ await step('asset.move（3.8.8 回傳行為確認）', async () => {
     if (!r || (!r.uuid && !r.url)) throw new Error(`move result=${JSON.stringify(r)}`);
 });
 
+console.log('\n[清理]');
+await step('清理測試節點與資產', async () => {
+    if (nodeUuid) await call('node', 'delete', { uuid: nodeUuid });
+    await call('asset', 'delete', { uuid: TEST_DIR });
+});
+
+// scene.save 放最後（open 會切換場景，避免影響前面步驟的清理）
 console.log('\n[scene.save（3.8.8 回場景 uuid）]');
 {
+    // 只能存 db://assets/ 下的場景；db://internal/ 為唯讀。逐一轉 url 過濾。
     const scenes = await call('asset', 'query_assets', { cc_type: 'cc.SceneAsset' }).catch(() => null);
-    const scene = scenes?.assets?.[0];
-    if (scene) {
-        await step(`開啟並儲存場景（${scene.url || scene.uuid}）`, async () => {
-            await call('scene', 'open', { uuid: scene.uuid });
+    const candidates = [];
+    for (const a of (scenes?.assets ?? []).slice(0, 5)) {
+        try {
+            const u = (await call('asset', 'convert', { value: a.uuid, to: 'url' })).url;
+            candidates.push({ uuid: a.uuid, url: u });
+        } catch { /* ignore */ }
+    }
+    let pick = candidates.find((s) => s.url.startsWith('db://assets/'));
+    let createdSceneUrl = null;
+    if (!pick && candidates.length > 0) {
+        // 專案內無可寫場景 → 從內建場景複製一份到 assets（結束刪除）
+        createdSceneUrl = 'db://assets/mcp-388-scene.scene';
+        await call('asset', 'delete', { uuid: createdSceneUrl }).catch(() => {});
+        const copied = await call('asset', 'copy', { source: candidates[0].url, target: createdSceneUrl });
+        pick = { uuid: copied.uuid, url: createdSceneUrl };
+        await sleep(500);
+    }
+    if (pick) {
+        await step(`開啟並儲存場景（${pick.url}，save 應回 uuid）`, async () => {
+            await call('scene', 'open', { uuid: pick.uuid });
             await sleep(1500);
             const r = await call('scene', 'save');
             console.log(`    save → ${JSON.stringify(r)}`);
@@ -144,17 +168,16 @@ console.log('\n[scene.save（3.8.8 回場景 uuid）]');
             // 3.8.8 應回傳場景 uuid（adapter 統一為 {saved, uuid}）
             if (!r.uuid) throw new Error('3.8.8 預期回傳場景 uuid，但 uuid 為空');
         });
+        if (createdSceneUrl) {
+            await step('刪除測試場景資產（編輯器中留著已開啟的場景屬預期）', async () => {
+                await call('asset', 'delete', { uuid: createdSceneUrl });
+            });
+        }
     } else {
-        console.log('  ⚠ 專案內無場景資產，跳過 save 測試');
+        console.log('  ⚠ 找不到任何場景資產，跳過 save 測試');
         skipped++;
     }
 }
-
-console.log('\n[清理]');
-await step('清理測試節點與資產', async () => {
-    if (nodeUuid) await call('node', 'delete', { uuid: nodeUuid });
-    await call('asset', 'delete', { uuid: TEST_DIR });
-});
 
 console.log(`\n結果：${passed} passed, ${failed} failed, ${skipped} skipped`);
 if (failures.length) {
