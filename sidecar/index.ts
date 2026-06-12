@@ -25,7 +25,7 @@ import {
     resolveProjectPath,
 } from './project-resolver';
 
-const SIDECAR_VERSION = '2.0.0';
+const SIDECAR_VERSION = '2.0.0-beta.1';
 
 function log(...args: unknown[]): void {
     console.error('[cocos-mcp]', ...args);
