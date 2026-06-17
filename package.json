@@ -63,6 +63,11 @@
                 "methods": [
                     "getServerStatus"
                 ]
+            },
+            "install-deps": {
+                "methods": [
+                    "installDeps"
+                ]
             }
         },
         "scene": {

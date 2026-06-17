@@ -12,8 +12,11 @@
  *      檔案不存在或路徑失效（例如專案搬到新機器）→ 改掃 extensions/(任意名稱)/dist-sidecar/index.js
  *   3. require(entry) 啟動 sidecar；sidecar 自己會再做「活著的 bridge 優先」的精確定位
  *
- * 注意：腳本內只能用雙引號（外層以單引號包給 shell——zsh/bash 與 PowerShell 皆可；
- * cmd.exe 不支援單引號，Windows 請在 PowerShell 執行或改用手動 JSON 設定）。
+ * 引號策略（依 shell 不同分兩版，見下方 build*Command）：
+ *   - zsh/bash：腳本內用雙引號，外層用單引號包 → buildPosixCommand
+ *   - PowerShell：PS 5.1 會吃掉傳給原生指令的內嵌雙引號，所以腳本改用單引號、
+ *     外層用雙引號包 → buildWindowsCommand（BOOTSTRAP_SCRIPT 內無單引號，可安全轉換）
+ * 面板會依 process.platform 自動選對應版本顯示。cmd.exe 不支援，請用 PowerShell。
  */
 
 export const BOOTSTRAP_SCRIPT =
@@ -38,7 +41,20 @@ export const BOOTSTRAP_SCRIPT =
     'if(!entry){console.error("[cocos-mcp] sidecar not found in "+proj);process.exit(1)}' +
     'require(entry);';
 
-/** 組出可直接貼到終端機的一鍵設定指令（zsh / bash / PowerShell 通用） */
-export function buildUniversalCommand(): string {
+/** 腳本的單引號版（給 PowerShell）。BOOTSTRAP_SCRIPT 依約定只用雙引號、不含單引號，故可安全整批轉換。 */
+const BOOTSTRAP_SCRIPT_SQ = BOOTSTRAP_SCRIPT.replace(/"/g, "'");
+
+/** zsh / bash 版：雙引號腳本、外層單引號包。 */
+export function buildPosixCommand(): string {
     return `claude mcp add --scope user cocos -- node -e '${BOOTSTRAP_SCRIPT}'`;
+}
+
+/** PowerShell 版：單引號腳本、外層雙引號包（PS 5.1 會吃掉內嵌雙引號，故不能用 POSIX 版）。 */
+export function buildWindowsCommand(): string {
+    return `claude mcp add --scope user cocos -- node -e "${BOOTSTRAP_SCRIPT_SQ}"`;
+}
+
+/** 依平台選對應 shell 的一鍵設定指令。 */
+export function buildCommandForPlatform(platform: NodeJS.Platform = process.platform): string {
+    return platform === 'win32' ? buildWindowsCommand() : buildPosixCommand();
 }
