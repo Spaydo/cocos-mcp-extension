@@ -9,17 +9,12 @@
 
     <h3>一鍵設定 <span id="platform" class="badge"></span></h3>
     <p class="tip">
-        首次使用分兩步：<b>① 先安裝相依套件</b>（讓 sidecar 能啟動）<b>② 複製指令貼到終端機執行一次</b>
-        （--scope user，全部專案通用），之後<b>重開 Claude Code</b> 才會生效。指令<b>不含任何固定路徑</b>，
-        換電腦、換專案、交給其他人都是同一條，會自動連到該專案正在運行的編輯器。
+        擴展已預編譯、即開即用 —— 只要把下方指令在終端機執行一次（--scope user，全部專案通用），
+        之後<b>重開 Claude Code</b> 即生效。指令<b>不含任何固定路徑</b>，換電腦、換專案、交給其他人都是同一條，
+        會自動連到該專案正在運行的編輯器。
     </p>
     <div class="row">
-        <ui-button id="btn-install" class="green">① 安裝相依套件</ui-button>
-        <span id="install-status" class="copied"></span>
-    </div>
-    <pre id="install-log" class="config" style="display:none"></pre>
-    <div class="row">
-        <ui-button id="btn-copy-cmd">② 複製指令</ui-button>
+        <ui-button id="btn-copy-cmd">複製指令</ui-button>
         <span id="copied-cmd" class="copied"></span>
     </div>
     <pre id="cmd" class="config"></pre>

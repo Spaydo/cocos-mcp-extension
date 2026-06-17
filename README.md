@@ -27,18 +27,11 @@ Cocos Creator 編輯器
 
 ## 安裝
 
-1. 將本目錄複製到 Cocos 專案的 `extensions/` 下：
-
-```bash
-cd <你的專案>/extensions/cocos-mcp-extension
-npm install
-npm run build
-```
-
+1. 將本目錄複製到 Cocos 專案的 `extensions/` 下
 2. 在編輯器中啟用：**擴展 → 擴展管理器 → 已安裝**，啟用 `cocos-mcp-extension`
 3. 系統需求：**Node.js ≥ 18**（sidecar 執行用；編輯器內部分無額外需求）
 
-> 已預編譯（`dist/`、`dist-sidecar/`）可直接使用；只有修改原始碼後才需要重新 build。
+> **即開即用**：`dist/`（編輯器端）與 `dist-sidecar/`（sidecar，已用 esbuild 連同 `@modelcontextprotocol/sdk` 打包成單一自帶相依檔）皆已預編譯入庫，複製進專案即可使用，**不需 `npm install`、也不需 build**。安裝相依與編譯只在修改原始碼時需要（見最下方「開發」）。唯一仍需手動的，是把面板上那條「一鍵設定」指令在終端機執行一次。
 
 ## 連接 AI 客戶端
 
@@ -47,7 +40,7 @@ npm run build
 
    - 使用 `--scope user`，**所有專案通用、只需設定一次**
    - 指令**不含任何固定路徑**：執行時從客戶端的工作目錄「同層或向下」尋找帶有本擴展的 Cocos 專案，換電腦、換專案、交給其他人都是同一條指令
-   - macOS（zsh/bash）與 Windows（PowerShell）指令相同；Windows 的舊式 cmd.exe 請改用手動 JSON 設定（亦顯示於面板）
+   - 面板會**依作業系統自動顯示對應版本**：macOS（zsh/bash）腳本用雙引號、外層單引號包；Windows（PowerShell）腳本用單引號、外層雙引號包（PS 5.1 會吃掉傳給原生指令的內嵌雙引號，故 Windows 必須用此版）。直接複製面板上那條即可。舊式 cmd.exe 不支援，請用 PowerShell 或改用手動 JSON 設定（亦顯示於面板）
 
 3. 在**專案資料夾**（或多專案的**上層資料夾**）開啟 Claude Code，`/mcp` 應顯示 `cocos` 已連線
 
@@ -80,11 +73,14 @@ npm run build
 ## 開發
 
 ```bash
-npm run build            # 編譯（編輯器端 + sidecar）
+npm install              # 安裝開發相依（typescript / esbuild / 型別定義）— 僅開發者需要
+npm run build            # 編譯：tsc 編輯器端 + esbuild 打包 sidecar（連同相依，產出自我完整單檔）
 npm test                 # 自動化測試（不需開編輯器，49 項）
 node test/verify-3b.mjs  # 實機驗證：核心工具（需編輯器開啟）
 node test/verify-3c.mjs  # 實機驗證：周邊工具（需編輯器開啟）
 ```
+
+- **產物入庫、即開即用**：`dist/`、`dist-sidecar/` 已預編譯入庫，一般使用者免裝免編。`npm install` 與 `npm run build` 只有改原始碼的開發者需要。`build:sidecar` 用 esbuild 把 sidecar 連同 `@modelcontextprotocol/sdk` 打包成單一 `dist-sidecar/index.js`（不依賴 `node_modules`）；`build:editor` 用 tsc 編輯器端（零第三方相依）。改完原始碼記得重 build 並把產物一起 commit。
 
 - 修改工具層代碼（`source/tools/`、`source/adapters.ts`）後：build 完呼叫 `dev` 工具的 `reload_tools` 即可熱載入，**不需重啟編輯器**；修改 `main.ts`/`bridge/`/`scene.ts` 才需要重啟
 - API 開發依據：[docs/api-reference/](docs/api-reference/00-README.md)（官方 3.8.4/3.8.8 完整 API 目錄、版本差異、實測陷阱）

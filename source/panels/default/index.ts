@@ -12,13 +12,6 @@ interface PanelStatus {
     editorVersion: string;
     toolCount: number;
     sidecarEntry: string;
-    depsInstalled: boolean;
-}
-
-interface InstallResult {
-    ok: boolean;
-    code: number | null;
-    tail: string;
 }
 
 const PKG = 'cocos-mcp-extension';
@@ -51,9 +44,6 @@ module.exports = Editor.Panel.define({
         platform: '#platform',
         cmd: '#cmd',
         config: '#config',
-        btnInstall: '#btn-install',
-        installStatus: '#install-status',
-        installLog: '#install-log',
         btnCopyCmd: '#btn-copy-cmd',
         btnCopyJson: '#btn-copy-json',
         copiedCmd: '#copied-cmd',
@@ -90,12 +80,6 @@ module.exports = Editor.Panel.define({
             if (cmdEl) {
                 cmdEl.textContent = buildCommandForPlatform(process.platform);
             }
-            // Reflect dep-install state, unless an install is in flight (don't clobber 安裝中…).
-            const installStatusEl = this.$.installStatus as HTMLElement | null;
-            if (installStatusEl && !(this as any)._installing) {
-                installStatusEl.textContent = status.depsInstalled ? '已安裝 ✓' : '尚未安裝';
-                installStatusEl.className = status.depsInstalled ? 'copied' : 'copied warn';
-            }
             if (configEl) {
                 const config = {
                     mcpServers: {
@@ -120,7 +104,6 @@ module.exports = Editor.Panel.define({
         const self = this as any;
         const btnStart = this.$.btnStart as HTMLElement | null;
         const btnStop = this.$.btnStop as HTMLElement | null;
-        const btnInstall = this.$.btnInstall as HTMLElement | null;
         const btnCopyCmd = this.$.btnCopyCmd as HTMLElement | null;
         const btnCopyJson = this.$.btnCopyJson as HTMLElement | null;
         if (btnStart) {
@@ -133,30 +116,6 @@ module.exports = Editor.Panel.define({
             btnStop.addEventListener('confirm', async () => {
                 await Editor.Message.request(PKG, 'stop-server');
                 await self.refresh();
-            });
-        }
-        if (btnInstall) {
-            btnInstall.addEventListener('confirm', async () => {
-                const statusSpan = this.$.installStatus as HTMLElement | null;
-                const logEl = this.$.installLog as HTMLElement | null;
-                self._installing = true;
-                if (statusSpan) { statusSpan.textContent = '安裝中…（請稍候，會連網下載）'; statusSpan.className = 'copied warn'; }
-                if (logEl) { logEl.style.display = 'none'; logEl.textContent = ''; }
-                try {
-                    const r = (await Editor.Message.request(PKG, 'install-deps')) as InstallResult;
-                    if (r.ok) {
-                        if (statusSpan) { statusSpan.textContent = '已安裝 ✓'; statusSpan.className = 'copied'; }
-                    } else {
-                        if (statusSpan) { statusSpan.textContent = `安裝失敗 (code ${r.code})`; statusSpan.className = 'copied err'; }
-                        if (logEl && r.tail) { logEl.style.display = ''; logEl.textContent = r.tail; }
-                    }
-                } catch (err) {
-                    if (statusSpan) { statusSpan.textContent = '安裝失敗'; statusSpan.className = 'copied err'; }
-                    if (logEl) { logEl.style.display = ''; logEl.textContent = String(err); }
-                } finally {
-                    self._installing = false;
-                    await self.refresh();
-                }
             });
         }
         if (btnCopyCmd) {

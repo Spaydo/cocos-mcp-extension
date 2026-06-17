@@ -66,11 +66,3 @@
     color: #6abe30;
     align-self: center;
 }
-
-.copied.warn {
-    color: #d2a106;
-}
-
-.copied.err {
-    color: #d9534f;
-}

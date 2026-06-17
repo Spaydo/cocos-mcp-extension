@@ -9,7 +9,7 @@
         "preinstall": "node ./scripts/preinstall.js",
         "build": "npm run build:editor && npm run build:sidecar",
         "build:editor": "tsc -p tsconfig.json",
-        "build:sidecar": "tsc -p tsconfig.sidecar.json",
+        "build:sidecar": "tsc --noEmit -p tsconfig.sidecar.json && esbuild sidecar/index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist-sidecar/index.js",
         "test": "node test/run-tests.mjs"
     },
     "description": "i18n:cocos-mcp-extension.description",
@@ -17,6 +17,7 @@
     "devDependencies": {
         "@cocos/creator-types": "^3.8.4",
         "@types/node": "^18.17.1",
+        "esbuild": "^0.28.1",
         "typescript": "^5.9.3"
     },
     "dependencies": {
@@ -62,11 +63,6 @@
             "get-server-status": {
                 "methods": [
                     "getServerStatus"
-                ]
-            },
-            "install-deps": {
-                "methods": [
-                    "installDeps"
                 ]
             }
         },

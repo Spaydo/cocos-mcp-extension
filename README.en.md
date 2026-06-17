@@ -27,18 +27,11 @@ Why a sidecar: the 3.8.4 editor embeds Node 14.16 which cannot run the MCP SDK (
 
 ## Install
 
-1. Copy this folder into your project's `extensions/` directory:
-
-```bash
-cd <your-project>/extensions/cocos-mcp-extension
-npm install
-npm run build
-```
-
+1. Copy this folder into your project's `extensions/` directory
 2. Enable it in the editor: **Extension → Extension Manager → Installed**
 3. Requirement: **Node.js ≥ 18** on your system (for the sidecar)
 
-> Precompiled `dist/` and `dist-sidecar/` are included; rebuilding is only needed after source changes.
+> **Zero-setup**: the precompiled `dist/` (editor side) and `dist-sidecar/` (sidecar, bundled with `@modelcontextprotocol/sdk` into a single self-contained file via esbuild) are committed, so copying the folder in is enough — **no `npm install`, no build**. Installing deps and building are only needed when editing the source (see "Development"). The one remaining manual step is running the panel's one-shot setup command once in a terminal.
 
 ## Connect an AI client
 
@@ -46,7 +39,7 @@ npm run build
 2. Copy the **one-shot setup command** from the panel and run it once in a terminal:
    - Registered with `--scope user`: works for **all projects, set up once**
    - The command contains **no machine-specific paths** — at launch it locates the Cocos project (with this extension) at or below the client's working directory; the same command works on any machine
-   - Identical on macOS (zsh/bash) and Windows (PowerShell); for legacy cmd.exe use the manual JSON config (also shown on the panel)
+   - The panel **auto-shows the right version per OS**: macOS (zsh/bash) wraps the script in single quotes; Windows (PowerShell) wraps it in double quotes with a single-quoted script (PowerShell strips embedded double quotes from native-command args, so Windows must use this form). Just copy what the panel shows. Legacy cmd.exe is unsupported — use PowerShell, or the manual JSON config (also shown on the panel)
 3. Open Claude Code inside the project folder (or one level above for multi-project roots); `/mcp` should show `cocos` connected
 
 Multi-instance: with several editors and several AI clients open, each client connects to the project that matches its working directory. If the editor isn't running, tools return a clear error and recover automatically once it starts.
@@ -70,11 +63,14 @@ All tools are consolidated: one tool with an `action` parameter, e.g. `{ "action
 ## Development
 
 ```bash
-npm run build            # compile (editor side + sidecar)
+npm install              # install dev deps (typescript / esbuild / types) — developers only
+npm run build            # compile: tsc for the editor side + esbuild bundles the sidecar (deps inlined)
 npm test                 # automated tests, no editor needed (49 checks)
 node test/verify-3b.mjs  # live verification: core tools (editor must be running)
 node test/verify-3c.mjs  # live verification: peripheral tools
 ```
+
+- **Artifacts are committed; zero-setup for users.** `dist/` and `dist-sidecar/` are checked in, so users need neither `npm install` nor a build. Those are only for developers editing the source. `build:sidecar` uses esbuild to bundle the sidecar plus `@modelcontextprotocol/sdk` into a single `dist-sidecar/index.js` (no `node_modules` at runtime); `build:editor` uses tsc (the editor side has no third-party runtime deps). Rebuild and commit the artifacts after changing source.
 
 - After changing tool-layer code (`source/tools/`, `source/adapters.ts`): build, then call the `dev` tool's `reload_tools` action — **no editor restart needed**. Changes to `main.ts`/`bridge/`/`scene.ts` require a restart.
 - API reference: [docs/api-reference/](docs/api-reference/00-README.md) (full 3.8.4/3.8.8 API catalog, version diffs, runtime pitfalls discovered through testing)

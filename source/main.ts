@@ -1,8 +1,6 @@
 /**
  * 擴展主進程入口：生命週期 + 面板訊息。
  */
-import { spawn } from 'child_process';
-import { existsSync } from 'fs';
 import { join } from 'path';
 import { clearBridgeInfo, writeBridgeInfo, writeSidecarInfo, writeToolsCache } from './bridge/discovery';
 import { BridgeServer } from './bridge/server';
@@ -68,52 +66,11 @@ export interface ServerStatus {
     editorVersion: string;
     toolCount: number;
     sidecarEntry: string;
-    /** sidecar 的 npm 相依（@modelcontextprotocol/sdk）是否已安裝；未裝時 sidecar 無法啟動。 */
-    depsInstalled: boolean;
-}
-
-export interface InstallResult {
-    ok: boolean;
-    code: number | null;
-    /** npm 輸出末段，供面板顯示成功/失敗訊息。 */
-    tail: string;
-}
-
-/** 擴展根目錄（__dirname = <擴展>/dist，故往上一層）。 */
-function extensionRoot(): string {
-    return join(__dirname, '..');
 }
 
 /** sidecar 入口的絕對路徑（__dirname = <擴展>/dist） */
 function sidecarEntry(): string {
     return join(__dirname, '..', 'dist-sidecar', 'index.js');
-}
-
-/** sidecar 的 runtime 相依是否已安裝。 */
-function depsInstalled(): boolean {
-    return existsSync(join(extensionRoot(), 'node_modules', '@modelcontextprotocol', 'sdk'));
-}
-
-/** 在擴展根目錄跑 `npm install`（shell:true 以相容 Windows 的 npm.cmd），收集輸出末段回報。 */
-function runNpmInstall(): Promise<InstallResult> {
-    return new Promise((resolve) => {
-        const root = extensionRoot();
-        console.log('[cocos-mcp] npm install in', root);
-        const child = spawn('npm install', { cwd: root, shell: true });
-        let buf = '';
-        const cap = (d: Buffer) => {
-            buf += d.toString();
-            if (buf.length > 8000) buf = buf.slice(-8000);   // 只留末段，避免吃記憶體
-        };
-        child.stdout?.on('data', cap);
-        child.stderr?.on('data', cap);
-        child.on('error', (err) => resolve({ ok: false, code: null, tail: String((err && err.message) || err) }));
-        child.on('close', (code) => {
-            const tail = buf.split(/\r?\n/).filter(Boolean).slice(-12).join('\n');
-            console.log(`[cocos-mcp] npm install exited code=${code}`);
-            resolve({ ok: code === 0, code, tail });
-        });
-    });
 }
 
 function extensionVersion(): string {
@@ -132,7 +89,6 @@ function getStatus(): ServerStatus {
         editorVersion: env ? env.version.raw : Editor.App.version,
         toolCount: registry ? registry.toolNames().length : 0,
         sidecarEntry: sidecarEntry(),
-        depsInstalled: depsInstalled(),
     };
 }
 
@@ -188,9 +144,6 @@ export const methods: Record<string, (...args: any[]) => any> = {
     },
     getServerStatus(): ServerStatus {
         return getStatus();
-    },
-    async installDeps(): Promise<InstallResult> {
-        return runNpmInstall();
     },
 };
 
