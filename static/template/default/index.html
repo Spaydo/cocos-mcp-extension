@@ -9,17 +9,25 @@
 
     <h3>一鍵設定 <span id="platform" class="badge"></span></h3>
     <p class="tip">
-        擴展已預編譯、即開即用 —— 只要把下方指令在終端機執行一次（--scope user，全部專案通用），
-        之後<b>重開 Claude Code</b> 即生效。指令<b>不含任何固定路徑</b>，換電腦、換專案、交給其他人都是同一條，
-        會自動連到該專案正在運行的編輯器。
+        擴展已預編譯、即開即用。下方一鍵指令只要在終端機執行一次，就會註冊到使用者層級的 MCP 設定；
+        指令<b>不含任何固定路徑</b>，換電腦、換專案、交給其他人都是同一條，會自動連到該專案正在運行的編輯器。
     </p>
+
+    <h4>Claude Code（目前平台）</h4>
     <div class="row">
-        <ui-button id="btn-copy-cmd">複製指令</ui-button>
+        <ui-button id="btn-copy-cmd">複製 Claude 指令</ui-button>
         <span id="copied-cmd" class="copied"></span>
     </div>
     <pre id="cmd" class="config"></pre>
 
-    <h3>或：手動加入 MCP 設定檔（固定連此專案）</h3>
+    <h4>Codex（目前平台）</h4>
+    <div class="row">
+        <ui-button id="btn-copy-codex">複製 Codex 指令</ui-button>
+        <span id="copied-codex" class="copied"></span>
+    </div>
+    <pre id="codex-cmd" class="config"></pre>
+
+    <h3>或：手動加入 MCP JSON 設定檔（Claude / Cursor / Windsurf，固定連此專案）</h3>
     <div class="row">
         <ui-button id="btn-copy-json">複製 JSON</ui-button>
         <span id="copied-json" class="copied"></span>

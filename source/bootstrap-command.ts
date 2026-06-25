@@ -19,6 +19,8 @@
  * 面板會依 process.platform 自動選對應版本顯示。cmd.exe 不支援，請用 PowerShell。
  */
 
+export type McpClient = 'claude' | 'codex';
+
 export const BOOTSTRAP_SCRIPT =
     'var f=require("fs"),p=require("path");' +
     'function has(d){return f.existsSync(p.join(d,"temp","cocos-mcp","sidecar.json"))}' +
@@ -44,17 +46,36 @@ export const BOOTSTRAP_SCRIPT =
 /** 腳本的單引號版（給 PowerShell）。BOOTSTRAP_SCRIPT 依約定只用雙引號、不含單引號，故可安全整批轉換。 */
 const BOOTSTRAP_SCRIPT_SQ = BOOTSTRAP_SCRIPT.replace(/"/g, "'");
 
+function clientAddCommand(client: McpClient): string {
+    return client === 'claude'
+        ? 'claude mcp add --scope user cocos'
+        : 'codex mcp add cocos';
+}
+
 /** zsh / bash 版：雙引號腳本、外層單引號包。 */
-export function buildPosixCommand(): string {
-    return `claude mcp add --scope user cocos -- node -e '${BOOTSTRAP_SCRIPT}'`;
+export function buildPosixCommand(client: McpClient = 'claude'): string {
+    return `${clientAddCommand(client)} -- node -e '${BOOTSTRAP_SCRIPT}'`;
 }
 
 /** PowerShell 版：單引號腳本、外層雙引號包（PS 5.1 會吃掉內嵌雙引號，故不能用 POSIX 版）。 */
-export function buildWindowsCommand(): string {
-    return `claude mcp add --scope user cocos -- node -e "${BOOTSTRAP_SCRIPT_SQ}"`;
+export function buildWindowsCommand(client: McpClient = 'claude'): string {
+    return `${clientAddCommand(client)} -- node -e "${BOOTSTRAP_SCRIPT_SQ}"`;
 }
 
-/** 依平台選對應 shell 的一鍵設定指令。 */
+/** 依平台選對應 shell 與 MCP 客戶端的一鍵設定指令。 */
+export function buildClientCommandForPlatform(
+    client: McpClient,
+    platform: NodeJS.Platform = process.platform,
+): string {
+    return platform === 'win32' ? buildWindowsCommand(client) : buildPosixCommand(client);
+}
+
+/** 依平台選對應 shell 的 Claude 一鍵設定指令。 */
 export function buildCommandForPlatform(platform: NodeJS.Platform = process.platform): string {
-    return platform === 'win32' ? buildWindowsCommand() : buildPosixCommand();
+    return buildClientCommandForPlatform('claude', platform);
+}
+
+/** 依平台選對應 shell 的 Codex 一鍵設定指令。 */
+export function buildCodexCommandForPlatform(platform: NodeJS.Platform = process.platform): string {
+    return buildClientCommandForPlatform('codex', platform);
 }

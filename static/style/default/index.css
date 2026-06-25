@@ -12,6 +12,11 @@
     margin: 16px 0 4px;
 }
 
+.wrap h4 {
+    margin: 12px 0 4px;
+    font-size: 12px;
+}
+
 .status {
     font-size: 14px;
     font-weight: bold;

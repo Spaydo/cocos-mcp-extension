@@ -3,7 +3,10 @@
  */
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { buildCommandForPlatform } from '../../bootstrap-command';
+import {
+    buildCodexCommandForPlatform,
+    buildCommandForPlatform,
+} from '../../bootstrap-command';
 
 interface PanelStatus {
     running: boolean;
@@ -43,10 +46,13 @@ module.exports = Editor.Panel.define({
         btnStop: '#btn-stop',
         platform: '#platform',
         cmd: '#cmd',
+        codexCmd: '#codex-cmd',
         config: '#config',
         btnCopyCmd: '#btn-copy-cmd',
+        btnCopyCodex: '#btn-copy-codex',
         btnCopyJson: '#btn-copy-json',
         copiedCmd: '#copied-cmd',
+        copiedCodex: '#copied-codex',
         copiedJson: '#copied-json',
     },
     methods: {
@@ -63,6 +69,7 @@ module.exports = Editor.Panel.define({
             const detailEl = this.$.detail as HTMLElement | null;
             const platformEl = this.$.platform as HTMLElement | null;
             const cmdEl = this.$.cmd as HTMLElement | null;
+            const codexCmdEl = this.$.codexCmd as HTMLElement | null;
             const configEl = this.$.config as HTMLElement | null;
             if (statusEl) {
                 statusEl.textContent = status.running
@@ -79,6 +86,9 @@ module.exports = Editor.Panel.define({
             }
             if (cmdEl) {
                 cmdEl.textContent = buildCommandForPlatform(process.platform);
+            }
+            if (codexCmdEl) {
+                codexCmdEl.textContent = buildCodexCommandForPlatform(process.platform);
             }
             if (configEl) {
                 const config = {
@@ -105,6 +115,7 @@ module.exports = Editor.Panel.define({
         const btnStart = this.$.btnStart as HTMLElement | null;
         const btnStop = this.$.btnStop as HTMLElement | null;
         const btnCopyCmd = this.$.btnCopyCmd as HTMLElement | null;
+        const btnCopyCodex = this.$.btnCopyCodex as HTMLElement | null;
         const btnCopyJson = this.$.btnCopyJson as HTMLElement | null;
         if (btnStart) {
             btnStart.addEventListener('confirm', async () => {
@@ -123,6 +134,13 @@ module.exports = Editor.Panel.define({
                 const text = (this.$.cmd as HTMLElement | null)?.textContent ?? '';
                 await copyText(text);
                 self.flashCopied(this.$.copiedCmd as HTMLElement | null);
+            });
+        }
+        if (btnCopyCodex) {
+            btnCopyCodex.addEventListener('confirm', async () => {
+                const text = (this.$.codexCmd as HTMLElement | null)?.textContent ?? '';
+                await copyText(text);
+                self.flashCopied(this.$.copiedCodex as HTMLElement | null);
             });
         }
         if (btnCopyJson) {
